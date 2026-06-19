@@ -6,5 +6,8 @@ models/*.npz
 models/*.json
 runs/*/
 data/datasets/registry.json
+data/datasets/guided-examples.json
 data/uploads/*-????????.pgn
-
+replays/*.pgn
+replays/registry.json
+tournaments/*.json

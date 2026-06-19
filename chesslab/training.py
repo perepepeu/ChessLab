@@ -10,21 +10,24 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 import chess
+import chess.pgn
 import numpy as np
 
 from .data import DatasetStore
 from .encoding import encode_board, material_score, move_to_id
 from .model import PolicyNetwork
+from .replays import ReplayStore
 
 
 class TrainingManager:
-    def __init__(self, root: Path, datasets: DatasetStore):
+    def __init__(self, root: Path, datasets: DatasetStore, replays: ReplayStore | None = None):
         self.root = root
         self.datasets = datasets
         self.models_dir = root / "models"
         self.runs_dir = root / "runs"
         self.models_dir.mkdir(exist_ok=True)
         self.runs_dir.mkdir(exist_ok=True)
+        self.replays = replays or ReplayStore(root)
         self.lock = threading.RLock()
         self.stop_event = threading.Event()
         self.thread: threading.Thread | None = None
@@ -71,7 +74,7 @@ class TrainingManager:
             layers = [int(v.strip()) for v in layers.split(",") if v.strip()]
         return {
             "name": str(config.get("name", "Aurora")).strip()[:40] or "Aurora",
-            "mode": config.get("mode", "hybrid") if config.get("mode") in {"imitation", "selfplay", "hybrid"} else "hybrid",
+            "mode": config.get("mode", "hybrid") if config.get("mode") in {"imitation", "selfplay", "hybrid", "guided"} else "hybrid",
             "hidden_layers": [max(8, min(256, int(v))) for v in layers[:3]] or [64],
             "epochs": max(1, min(50, int(config.get("epochs", 4)))),
             "batch_size": max(4, min(256, int(config.get("batch_size", 32)))),
@@ -80,7 +83,9 @@ class TrainingManager:
             "temperature": max(0.05, min(2.0, float(config.get("temperature", 0.7)))),
             "max_positions": max(64, min(100000, int(config.get("max_positions", 10000)))),
             "seed": int(config.get("seed", 42)),
-            "dataset_ids": list(config.get("dataset_ids", [])),
+            "dataset_ids": list(config["dataset_ids"]) if "dataset_ids" in config else None,
+            "include_guided": bool(config.get("include_guided", True)),
+            "base_model_id": Path(str(config.get("base_model_id", ""))).name or None,
         }
 
     def stop(self) -> None:
@@ -103,21 +108,33 @@ class TrainingManager:
     def _run(self, run_id: str, config: dict) -> None:
         started = time.time()
         try:
-            self.model = PolicyNetwork(config["hidden_layers"], config["seed"], config["name"])
+            if config["base_model_id"]:
+                base_path = self.models_dir / f"{config['base_model_id']}.npz"
+                if not base_path.exists():
+                    raise ValueError("O modelo base selecionado não existe mais.")
+                self.model, _ = PolicyNetwork.load(base_path)
+                self.model.name = config["name"]
+                config["hidden_layers"] = self.model.hidden_layers
+                self._log(f"Fine-tuning iniciado a partir de {config['base_model_id']}.")
+            else:
+                self.model = PolicyNetwork(config["hidden_layers"], config["seed"], config["name"])
             packed = None
             selected = []
-            if config["mode"] in {"imitation", "hybrid"}:
-                packed, selected = self.datasets.load_positions(config["dataset_ids"], config["max_positions"])
+            if config["mode"] in {"imitation", "hybrid", "guided"}:
+                dataset_ids = [] if config["mode"] == "guided" else config["dataset_ids"]
+                use_guided = config["mode"] == "guided" or config["include_guided"]
+                packed, selected = self.datasets.load_positions(dataset_ids, config["max_positions"], use_guided)
                 if len(packed["train"][1]) == 0:
                     raise ValueError("Importe e selecione ao menos um PGN antes do treino por imitação.")
                 self._log(f"{len(packed['train'][1]):,} posições de treino carregadas de {len(selected)} conjunto(s).")
                 self._train_imitation(packed, config)
             if not self.stop_event.is_set() and config["mode"] in {"selfplay", "hybrid"}:
-                self._train_selfplay(config)
+                self._train_selfplay(config, run_id)
             evaluation = self._evaluate(packed, config)
             model_id = f"{config['name'].lower().replace(' ', '-')}-{run_id}"
             model_path = self.models_dir / f"{model_id}.npz"
             metadata = {"id": model_id, "created_at": datetime.now(timezone.utc).isoformat(), "config": config,
+                        "parent_model_id": config["base_model_id"],
                         "evaluation": evaluation, "duration_seconds": round(time.time() - started, 2), "run_id": run_id}
             self.model.save(model_path, metadata)
             (self.models_dir / f"{model_id}.json").write_text(json.dumps(metadata, ensure_ascii=False, indent=2), encoding="utf-8")
@@ -155,33 +172,42 @@ class TrainingManager:
                 self.state["metrics"].append(metric)
             self._log(f"Época {epoch}/{epochs}: loss {metric['loss']} · validação {metric['validation'] * 100:.1f}%")
 
-    def _train_selfplay(self, config) -> None:
+    def _train_selfplay(self, config, run_id: str) -> None:
         episodes = config["selfplay_episodes"]
         self._set(stage="Autojogo por reforço")
         for episode in range(1, episodes + 1):
             if self.stop_event.is_set():
                 return
             board = chess.Board()
+            game = chess.pgn.Game()
+            game.headers.update({"Event": "ChessLab Self-play", "Date": datetime.now().strftime("%Y.%m.%d"),
+                                 "Round": str(episode), "White": self.model.name, "Black": self.model.name, "Result": "*"})
+            node = game
             trajectory: list[tuple[np.ndarray, int, chess.Color, float]] = []
+            entropies: list[float] = []
             for _ in range(120):
                 if board.is_game_over(claim_draw=True):
                     break
                 color = board.turn
-                move = self.model.choose_move(board, config["temperature"], sample=True)
-                if move is None:
+                moves, probabilities = self.model.policy(board, config["temperature"])
+                if not moves:
                     break
+                entropies.append(float(-np.sum(probabilities * np.log(np.clip(probabilities, 1e-8, 1.0)))))
+                move = moves[int(self.model.rng.choice(len(moves), p=probabilities))]
                 before = material_score(board, color)
                 state = encode_board(board)
+                node = node.add_variation(move)
                 board.push(move)
                 shaping = np.tanh((material_score(board, color) - before) / 5.0) * 0.08
                 trajectory.append((state, move_to_id(move), color, float(shaping)))
             outcome = board.outcome(claim_draw=True)
             winner = outcome.winner if outcome else None
+            game.headers["Result"] = outcome.result() if outcome else "1/2-1/2"
+            game.headers["Termination"] = outcome.termination.name if outcome else "Ply limit"
             if trajectory:
                 features = np.stack([t[0] for t in trajectory])
                 targets = np.asarray([t[1] for t in trajectory], dtype=np.int32)
                 rewards = np.asarray([(1.0 if winner == t[2] else -1.0 if winner is not None else 0.0) + t[3] for t in trajectory], dtype=np.float32)
-                # Centering creates a modest variance-reduction baseline.
                 advantages = rewards - rewards.mean() if len(rewards) > 1 else rewards
                 loss = self.model.train_batch(features, targets, config["learning_rate"] * 0.35, advantages)
             else:
@@ -189,10 +215,14 @@ class TrainingManager:
             base = 70 if config["mode"] == "hybrid" else 0
             span = 20 if config["mode"] == "hybrid" else 90
             self._set(progress=base + int(span * episode / episodes), loss=round(float(loss), 4), epoch=episode)
-            metric = {"step": episode, "loss": round(float(loss), 4), "reward": float(1 if winner else 0), "plies": len(trajectory), "stage": "autojogo"}
+            replay = self.replays.save_game(game, "selfplay", {"run_id": run_id,
+                "title": f"Treino {self.model.name} · episódio {episode}", "tags": [config["mode"]]})
+            metric = {"step": episode, "loss": round(float(loss), 4), "reward": float(1 if winner else 0),
+                      "plies": len(trajectory), "entropy": round(float(np.mean(entropies)), 4) if entropies else 0.0,
+                      "replay_id": replay["id"], "stage": "autojogo"}
             with self.lock:
                 self.state["metrics"].append(metric)
-            self._log(f"Autojogo {episode}/{episodes}: {len(trajectory)} lances · {outcome.result() if outcome else 'limite'}")
+            self._log(f"Autojogo {episode}/{episodes}: {len(trajectory)} lances · replay salvo")
 
     def _policy_accuracy(self, x: np.ndarray, y: np.ndarray, limit: int = 1000) -> float:
         if not len(y):
@@ -220,7 +250,8 @@ class TrainingManager:
             "runtime": {"hardware": platform.processor() or "CPU", "software": platform.python_version(), "numeric_precision": "fp32"},
             "seeds": [config["seed"], config["seed"] + 1, config["seed"] + 2],
             "baseline": {"name": "random legal policy", "version": "v1"},
-            "candidate": {"name": config["name"], "configuration": config, "initial_checkpoint": "none"},
+            "candidate": {"name": config["name"], "configuration": config,
+                          "initial_checkpoint": config["base_model_id"] or "none"},
             "budget": {"training_steps": self.model.step, "environment_interactions": config["selfplay_episodes"], "wall_clock_limit_minutes": 0},
             "evaluation": {"primary_metric": "held-out policy agreement", "held_out_suite": "pgn-game-split-v1",
                            "minimum_effect": 0.0, "maximum_regression": 0.05, "confidence_level": 0.95},
@@ -241,6 +272,31 @@ class TrainingManager:
             except (OSError, json.JSONDecodeError, KeyError):
                 continue
         return models
+
+    def import_checkpoint(self, file_storage) -> dict:
+        raw = file_storage.read()
+        if not raw:
+            raise ValueError("O arquivo do modelo está vazio.")
+        digest = hashlib.sha256(raw).hexdigest()[:10]
+        safe_stem = Path(file_storage.filename or "modelo-base.npz").stem.lower().replace(" ", "-")[:40]
+        model_id = f"{safe_stem}-{digest}"
+        path = self.models_dir / f"{model_id}.npz"
+        path.write_bytes(raw)
+        try:
+            model, embedded = PolicyNetwork.load(path)
+        except Exception as exc:
+            path.unlink(missing_ok=True)
+            raise ValueError("Este arquivo não é um checkpoint ChessLab válido.") from exc
+        metadata = {
+            "id": model_id, "created_at": datetime.now(timezone.utc).isoformat(), "imported": True,
+            "parent_model_id": embedded.get("parent_model_id"),
+            "config": embedded.get("config", {"name": model.name, "mode": "imported", "hidden_layers": model.hidden_layers}),
+            "evaluation": embedded.get("evaluation", {"parameters": model.parameter_count,
+                "trained_positions": model.trained_positions, "test_policy_accuracy": 0.0}),
+            "duration_seconds": embedded.get("duration_seconds", 0), "run_id": embedded.get("run_id"),
+        }
+        (self.models_dir / f"{model_id}.json").write_text(json.dumps(metadata, ensure_ascii=False, indent=2), encoding="utf-8")
+        return metadata
 
     def load_model(self, model_id: str) -> dict:
         path = self.models_dir / f"{Path(model_id).name}.npz"

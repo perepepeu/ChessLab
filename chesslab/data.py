@@ -4,7 +4,6 @@ import hashlib
 import json
 import shutil
 from datetime import datetime, timezone
-from io import StringIO
 from pathlib import Path
 
 import chess.pgn
@@ -18,10 +17,13 @@ class DatasetStore:
         self.root = root
         self.upload_dir = root / "uploads"
         self.registry_path = root / "datasets" / "registry.json"
+        self.guided_path = root / "datasets" / "guided-examples.json"
         self.upload_dir.mkdir(parents=True, exist_ok=True)
         self.registry_path.parent.mkdir(parents=True, exist_ok=True)
         if not self.registry_path.exists():
             self.registry_path.write_text("[]", encoding="utf-8")
+        if not self.guided_path.exists():
+            self.guided_path.write_text("[]", encoding="utf-8")
         self.bootstrap()
 
     def _registry(self) -> list[dict]:
@@ -93,8 +95,49 @@ class DatasetStore:
     def list(self) -> list[dict]:
         return self._registry()
 
-    def load_positions(self, ids: list[str] | None = None, max_positions: int = 20000):
-        selected = [d for d in self._registry() if not ids or d["id"] in ids]
+    def list_guided(self) -> list[dict]:
+        try:
+            return json.loads(self.guided_path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            return []
+
+    def add_guided(self, fen: str, move_uci: str, note: str = "", priority: int = 3) -> dict:
+        try:
+            board = chess.Board(fen)
+            move = chess.Move.from_uci(move_uci)
+        except ValueError as exc:
+            raise ValueError("Posição ou lance guiado inválido.") from exc
+        if move not in board.legal_moves:
+            raise ValueError("O lance ensinado precisa ser legal nesta posição.")
+        digest = hashlib.sha256(f"{board.fen()}|{move.uci()}".encode()).hexdigest()[:12]
+        examples = self.list_guided()
+        existing = next((item for item in examples if item["id"] == digest), None)
+        if existing:
+            existing.update(note=note.strip()[:200], priority=max(1, min(10, int(priority))))
+            item = existing
+        else:
+            item = {"id": digest, "fen": board.fen(), "move": move.uci(), "san": board.san(move),
+                    "note": note.strip()[:200], "priority": max(1, min(10, int(priority))),
+                    "created_at": datetime.now(timezone.utc).isoformat()}
+            examples.insert(0, item)
+        self.guided_path.write_text(json.dumps(examples, ensure_ascii=False, indent=2), encoding="utf-8")
+        return item
+
+    def delete_guided(self, example_id: str) -> None:
+        examples = [item for item in self.list_guided() if item["id"] != example_id]
+        self.guided_path.write_text(json.dumps(examples, ensure_ascii=False, indent=2), encoding="utf-8")
+
+    def guided_position(self, fen: str | None = None) -> dict:
+        try:
+            board = chess.Board(fen) if fen else chess.Board()
+        except ValueError as exc:
+            raise ValueError("FEN inválida.") from exc
+        return {"fen": board.fen(), "turn": "white" if board.turn else "black",
+                "legal_moves": [move.uci() for move in board.legal_moves], "check": board.is_check()}
+
+    def load_positions(self, ids: list[str] | None = None, max_positions: int = 20000,
+                       include_guided: bool = False):
+        selected = [d for d in self._registry() if ids is None or d["id"] in ids]
         splits = {"train": [[], []], "val": [[], []], "test": [[], []]}
         game_index = 0
         for dataset in selected:
@@ -111,6 +154,18 @@ class DatasetStore:
                         splits[split][1].append(move_to_id(move))
                         board.push(move)
                     game_index += 1
+        if include_guided:
+            examples = self.list_guided()
+            for example in examples:
+                board = chess.Board(example["fen"])
+                repetitions = max(1, min(10, int(example.get("priority", 3))))
+                for _ in range(repetitions):
+                    splits["train"][0].append(encode_board(board))
+                    splits["train"][1].append(move_to_id(chess.Move.from_uci(example["move"])))
+            guided_hash = hashlib.sha256(self.guided_path.read_bytes()).hexdigest()
+            if examples:
+                selected.append({"id": "guided", "name": "Mentor ChessLab", "sha256": guided_hash,
+                                 "games": 0, "positions": len(examples)})
         packed = {}
         for name, (features, labels) in splits.items():
             packed[name] = (
@@ -118,4 +173,3 @@ class DatasetStore:
                 np.asarray(labels, dtype=np.int32),
             )
         return packed, selected
-

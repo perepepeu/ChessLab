@@ -21,8 +21,11 @@
       <nav class="main-nav" aria-label="Navegação principal">
         <button class="nav-item active" data-view-link="overview"><span>◫</span> Visão geral</button>
         <button class="nav-item" data-view-link="arena"><span>♙</span> Arena</button>
+        <button class="nav-item" data-view-link="championship"><span>♛</span> Campeonato</button>
         <button class="nav-item" data-view-link="training"><span>⌁</span> Treinamento</button>
+        <button class="nav-item" data-view-link="mentor"><span>✦</span> Mentor</button>
         <button class="nav-item" data-view-link="datasets"><span>▱</span> Dados PGN</button>
+        <button class="nav-item" data-view-link="replays"><span>▷</span> Replays</button>
         <button class="nav-item" data-view-link="network"><span>✣</span> Rede neural</button>
         <button class="nav-item" data-view-link="models"><span>◇</span> Modelos</button>
       </nav>
@@ -77,11 +80,25 @@
       </section>
 
       <section class="view" id="view-arena">
-        <div class="page-heading"><div><span class="eyebrow">CHAMPION / CHALLENGER</span><h1>Teste na <em>arena.</em></h1><p>Jogue contra o checkpoint ativo e inspecione como a política responde.</p></div><div class="segmented" id="colorChoice"><button class="active" data-color="white">Brancas</button><button data-color="black">Pretas</button></div></div>
+        <div class="page-heading"><div><span class="eyebrow">CHAMPION / CHALLENGER</span><h1>Teste na <em>arena.</em></h1><p>Jogue contra o checkpoint ativo com busca tática opcional.</p></div><div class="arena-options"><div class="segmented" id="colorChoice"><button class="active" data-color="white">Brancas</button><button data-color="black">Pretas</button></div><select id="arenaStrength" class="select-control"><option value="policy">Política pura</option><option value="tactical" selected>Tática 1-ply</option><option value="search2">Busca 2-ply</option></select></div></div>
         <div class="arena-layout">
-          <div class="board-frame"><div class="board-top"><span><i class="avatar ai">AI</i><strong id="opponentName">Aurora</strong><small>rede ativa</small></span><span class="clock">∞</span></div><div id="chessboard" class="chessboard" aria-label="Tabuleiro de xadrez"></div><div class="board-bottom"><span><i class="avatar human">EU</i><strong>Você</strong><small id="playerColor">brancas</small></span><span class="clock">∞</span></div></div>
+          <div class="board-frame premium-frame"><div class="board-top"><span><i class="avatar ai">AI</i><strong id="opponentName">Aurora</strong><small>checkpoint ativo</small></span><span class="player-state"><i></i>PENSANDO</span></div><div class="board-shell"><div id="chessboard" class="chessboard premium-board" aria-label="Tabuleiro de xadrez"></div></div><div class="board-bottom"><span><i class="avatar human">EU</i><strong>Você</strong><small id="playerColor">brancas</small></span><button class="flip-board" id="flipBoard" title="Girar tabuleiro">↻ Girar</button></div></div>
           <aside class="panel game-panel"><div class="panel-head"><div><span class="eyebrow">PARTIDA ATUAL</span><h2>Console da arena</h2></div><span class="live-badge" id="gameState">AGUARDANDO</span></div><div class="game-eval"><span>PREVISÃO DA REDE</span><strong id="gameHint">Nova partida</strong><div class="eval-bar"><i></i></div></div><div class="move-log" id="moveLog"><div class="empty-state"><span>♙</span><p>Os lances aparecerão aqui.</p></div></div><button class="primary full" id="newGameButton">Nova partida</button><p class="fine-print">A rede só pode executar lances legais. Promoções usam dama por padrão.</p></aside>
         </div>
+      </section>
+
+      <section class="view" id="view-championship">
+        <div class="page-heading"><div><span class="eyebrow">LIGA DE CHECKPOINTS</span><h1>Modo <em>campeonato.</em></h1><p>Coloque versões congeladas frente a frente. Com um único modelo, o ChessLab cria um clone e executa autojogo espelhado.</p></div><span class="championship-live" id="championshipBadge"><i></i>PRONTO</span></div>
+        <div class="championship-layout">
+          <form class="panel config-panel" id="championshipForm">
+            <div class="panel-head"><div><span class="step-number">♛</span><h2>Configurar liga</h2></div></div>
+            <label>Competidores<div id="championshipModels" class="dataset-checks model-checks"></div></label>
+            <div class="form-grid"><label>Turnos completos<input name="rounds" type="number" min="1" max="10" value="1"><small>Cada pareamento troca as cores.</small></label><label>Limite de lances<input name="max_plies" type="number" min="20" max="300" value="80"></label><label>Exploração<input name="temperature" type="number" min="0.05" max="1.5" step="0.05" value="0.25"></label><label>Força<select name="search_level" class="select-control full-select"><option value="policy">Política pura</option><option value="tactical" selected>Tática 1-ply</option><option value="search2">Busca 2-ply</option></select></label></div>
+            <button class="primary full" type="submit" id="startChampionship">♛ Iniciar campeonato</button><button class="danger-button hidden" type="button" id="stopChampionship">Encerrar após a partida</button>
+          </form>
+          <article class="panel standings-panel"><div class="panel-head"><div><span class="eyebrow">CLASSIFICAÇÃO AO VIVO</span><h2 id="championshipStage">Aguardando competidores</h2></div><strong id="championshipProgress">0%</strong></div><div class="big-progress"><i id="championshipProgressBar"></i></div><div class="table-wrap"><table><thead><tr><th>MODELO</th><th>PTS</th><th>J</th><th>V/E/D</th><th>ELO</th></tr></thead><tbody id="standingsBody"><tr><td colspan="5">A classificação aparecerá aqui.</td></tr></tbody></table></div></article>
+        </div>
+        <article class="panel championship-games"><div class="panel-head"><div><span class="eyebrow">PARTIDAS GRAVADAS</span><h2>Últimos confrontos</h2></div><button class="text-button" data-view-link="replays">Abrir replays →</button></div><div id="championshipGames" class="match-list"><div class="empty-library">Nenhuma partida disputada.</div></div></article>
       </section>
 
       <section class="view" id="view-training">
@@ -90,9 +107,11 @@
           <form class="panel config-panel" id="trainingForm">
             <div class="panel-head"><div><span class="step-number">01</span><h2>Estratégia</h2></div></div>
             <label>Nome do modelo<input name="name" value="Aurora" maxlength="40"></label>
-            <label>Regime de aprendizado<div class="mode-cards"><input type="radio" name="mode" id="modeHybrid" value="hybrid" checked><label for="modeHybrid"><i>✦</i><strong>Híbrido</strong><small>PGN + autojogo</small></label><input type="radio" name="mode" id="modeImitation" value="imitation"><label for="modeImitation"><i>◫</i><strong>Imitação</strong><small>Aprende dos mestres</small></label><input type="radio" name="mode" id="modeSelf" value="selfplay"><label for="modeSelf"><i>∞</i><strong>Autojogo</strong><small>Explora sozinho</small></label></div></label>
+            <label>Regime de aprendizado<div class="mode-cards four"><input type="radio" name="mode" id="modeHybrid" value="hybrid" checked><label for="modeHybrid"><i>✦</i><strong>Híbrido</strong><small>PGN + autojogo</small></label><input type="radio" name="mode" id="modeImitation" value="imitation"><label for="modeImitation"><i>◫</i><strong>Imitação</strong><small>Aprende dos mestres</small></label><input type="radio" name="mode" id="modeSelf" value="selfplay"><label for="modeSelf"><i>∞</i><strong>Autojogo</strong><small>Explora sozinho</small></label><input type="radio" name="mode" id="modeGuided" value="guided"><label for="modeGuided"><i>✎</i><strong>Guiado</strong><small>Suas correções</small></label></div></label>
+            <label>Modelo base para ajuste fino<select name="base_model_id" id="baseModelSelect" class="select-control full-select"><option value="">Começar do zero</option></select><small>Ao escolher um checkpoint, a arquitetura e os pesos existentes são preservados.</small></label>
             <div class="form-grid"><label>Camadas ocultas<input name="hidden_layers" value="96, 64" placeholder="96, 64"><small>8–256 neurônios por camada</small></label><label>Seed<input name="seed" type="number" value="42"></label><label>Épocas<input name="epochs" type="number" min="1" max="50" value="4"></label><label>Tamanho do lote<input name="batch_size" type="number" min="4" max="256" value="32"></label><label>Taxa de aprendizado<input name="learning_rate" type="number" min="0.00001" max="0.05" step="0.0001" value="0.001"></label><label>Episódios de autojogo<input name="selfplay_episodes" type="number" min="1" max="100" value="8"></label><label>Temperatura<input name="temperature" type="number" min="0.05" max="2" step="0.05" value="0.7"><small>maior = mais exploração</small></label><label>Limite de posições<input name="max_positions" type="number" min="64" max="100000" value="10000"></label></div>
-            <label>Conjuntos de dados<div id="trainingDatasets" class="dataset-checks"></div></label>
+            <label>Conjuntos de dados <span class="selection-actions"><button type="button" id="selectAllDatasets">todos</button><button type="button" id="clearDatasets">nenhum</button></span><div id="trainingDatasets" class="dataset-checks"></div></label>
+            <label class="toggle-row"><input type="checkbox" name="include_guided" checked><span><strong>Incluir exemplos do Mentor</strong><small>Correções recebem peso conforme a prioridade definida.</small></span></label>
             <button class="primary full" type="submit" id="startTrainingButton"><span>▶</span> Começar experimento</button>
           </form>
           <div class="training-monitor">
@@ -102,11 +121,28 @@
         </div>
       </section>
 
+      <section class="view" id="view-mentor">
+        <div class="page-heading"><div><span class="eyebrow">APRENDIZADO GUIADO</span><h1>Seja o <em>mentor.</em></h1><p>Mostre à rede qual lance você prefere. Cada correção vira um exemplo supervisionado com prioridade ajustável.</p></div><button class="secondary" id="resetMentor">↺ Posição inicial</button></div>
+        <div class="mentor-layout">
+          <div class="mentor-board-wrap"><div class="mentor-turn"><span><i></i>LADO A JOGAR</span><strong id="mentorTurn">Brancas</strong></div><div class="board-shell compact"><div id="mentorBoard" class="chessboard premium-board" aria-label="Tabuleiro do Mentor"></div></div><div class="mentor-picked"><small>LANCE ENSINADO</small><strong id="mentorMove">Selecione origem e destino</strong></div></div>
+          <form class="panel mentor-form" id="mentorForm"><div class="panel-head"><div><span class="eyebrow">NOVA DEMONSTRAÇÃO</span><h2>Explique a decisão</h2></div><span class="mentor-count" id="mentorCount">0 exemplos</span></div><label>Comentário opcional<textarea name="note" rows="3" placeholder="Ex.: desenvolver com tempo e controlar o centro"></textarea></label><label>Prioridade <input name="priority" type="range" min="1" max="10" value="5"><span class="range-label"><small>normal</small><strong id="priorityValue">5×</strong><small>essencial</small></span></label><button class="primary full" type="submit" id="saveGuided" disabled>✦ Ensinar este lance</button><div class="mentor-tip"><b>Dica</b><p>Use prioridade alta para táticas críticas; exagerar em poucos exemplos pode causar memorização.</p></div></form>
+        </div>
+        <div class="library-head"><div><span class="eyebrow">MEMÓRIA DO MENTOR</span><h2>Exemplos recentes</h2></div></div><div id="guidedExamples" class="guided-grid"></div>
+      </section>
+
       <section class="view" id="view-datasets">
         <div class="page-heading"><div><span class="eyebrow">CONHECIMENTO ESPECIALISTA</span><h1>Biblioteca <em>PGN.</em></h1><p>Arraste arquivos com uma ou muitas partidas. Comentários, relógios e metadados são aceitos.</p></div></div>
         <div class="upload-zone" id="uploadZone"><input type="file" id="pgnInput" accept=".pgn" multiple hidden><div class="upload-icon">⇧</div><h2>Solte seus arquivos .pgn aqui</h2><p>ou <button type="button" id="browsePgn">procure no computador</button></p><small>até 64 MB por envio · múltiplos arquivos permitidos</small><div class="upload-progress"><i></i></div></div>
         <div class="library-head"><div><span class="eyebrow">CONJUNTOS IMPORTADOS</span><h2 id="datasetCount">0 conjuntos</h2></div><div class="search"><span>⌕</span><input id="datasetSearch" placeholder="Buscar jogador ou arquivo"></div></div>
         <div class="dataset-grid" id="datasetGrid"></div>
+      </section>
+
+      <section class="view" id="view-replays">
+        <div class="page-heading"><div><span class="eyebrow">MEMÓRIA EPISÓDICA</span><h1>Sala de <em>replays.</em></h1><p>Assista aos autojogos de treinamento e às partidas de campeonato, lance por lance.</p></div><span class="replay-total" id="replayTotal">0 partidas</span></div>
+        <div class="replay-layout">
+          <aside class="panel replay-library"><div class="panel-head"><div><span class="eyebrow">ARQUIVO</span><h2>Partidas salvas</h2></div><select id="replayFilter" class="select-control"><option value="all">Todos</option><option value="selfplay">Treinos</option><option value="championship">Campeonato</option></select></div><div id="replayList" class="replay-list"><div class="empty-library">Nenhum replay salvo.</div></div></aside>
+          <div class="replay-stage"><div class="replay-title"><span><small id="replaySource">SELECIONE UMA PARTIDA</small><strong id="replayPlayers">Replay ChessLab</strong></span><b id="replayResult">*</b></div><div class="board-shell replay-shell"><div id="replayBoard" class="chessboard premium-board" aria-label="Tabuleiro do replay"></div></div><div class="replay-controls"><button id="replayStart" title="Início">|‹</button><button id="replayPrev" title="Voltar">‹</button><button id="replayPlay" class="play-control" title="Reproduzir">▶</button><button id="replayNext" title="Avançar">›</button><button id="replayEnd" title="Fim">›|</button><span><strong id="replayPly">0</strong><small id="replaySan">posição inicial</small></span></div></div>
+        </div>
       </section>
 
       <section class="view" id="view-network">
@@ -117,7 +153,7 @@
       </section>
 
       <section class="view" id="view-models">
-        <div class="page-heading"><div><span class="eyebrow">COFRE DE CHECKPOINTS</span><h1>Seus <em>modelos.</em></h1><p>Carregue uma versão anterior, compare a avaliação e exporte o arquivo portátil.</p></div></div>
+        <div class="page-heading"><div><span class="eyebrow">COFRE DE CHECKPOINTS</span><h1>Seus <em>modelos.</em></h1><p>Carregue uma versão anterior, use-a como base de fine-tuning ou exporte o arquivo portátil.</p></div><div><input type="file" id="modelInput" accept=".npz" hidden><button class="secondary" id="importModel">⇧ Importar modelo base</button></div></div>
         <div class="model-grid" id="modelGrid"></div>
       </section>
     </main>
