@@ -1,0 +1,382 @@
+const $ = (selector, root = document) => root.querySelector(selector);
+const $$ = (selector, root = document) => [...root.querySelectorAll(selector)];
+
+const state = {
+  dashboard: null,
+  training: null,
+  datasets: [],
+  models: [],
+  view: 'overview',
+  game: null,
+  color: 'white',
+  selected: null,
+  moves: [],
+  lastMove: null,
+  network: null,
+  networkNodes: [],
+};
+
+const pieceFiles = {
+  P: 'w_Pawn.png', N: 'w_Knight.png', B: 'w_Bishop.png', R: 'w_Rook.png', Q: 'w_Queen.png', K: 'w_King.png',
+  p: 'b_Pawn.png', n: 'b_Knight.png', b: 'b_Bishop.png', r: 'b_Rook.png', q: 'b_Queen.png', k: 'b_King.png',
+};
+
+async function api(url, options = {}) {
+  const response = await fetch(url, options);
+  const payload = await response.json().catch(() => ({ ok: false, error: 'Resposta inválida do servidor.' }));
+  if (!response.ok || !payload.ok) throw new Error(payload.error || `Erro ${response.status}`);
+  return payload;
+}
+
+function toast(message, type = 'success') {
+  const element = document.createElement('div');
+  element.className = `toast ${type}`;
+  element.textContent = message;
+  $('#toastStack').appendChild(element);
+  setTimeout(() => element.remove(), 3800);
+}
+
+function formatNumber(value) {
+  const n = Number(value || 0);
+  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(2)}M`;
+  if (n >= 1_000) return `${(n / 1_000).toFixed(n >= 100_000 ? 0 : 1)}k`;
+  return n.toLocaleString('pt-BR');
+}
+
+function formatBytes(value) {
+  if (!value) return '0 KB';
+  if (value > 1_000_000) return `${(value / 1_000_000).toFixed(1)} MB`;
+  return `${Math.ceil(value / 1000)} KB`;
+}
+
+function ago(date) {
+  const seconds = Math.max(1, (Date.now() - new Date(date).getTime()) / 1000);
+  if (seconds < 90) return 'agora';
+  if (seconds < 3600) return `há ${Math.floor(seconds / 60)} min`;
+  if (seconds < 86400) return `há ${Math.floor(seconds / 3600)} h`;
+  return new Date(date).toLocaleDateString('pt-BR');
+}
+
+const viewNames = { overview: 'VISÃO GERAL', arena: 'ARENA', training: 'TREINAMENTO', datasets: 'DADOS PGN', network: 'REDE NEURAL', models: 'MODELOS' };
+
+function changeView(view) {
+  if (!viewNames[view]) return;
+  state.view = view;
+  $$('.view').forEach((el) => el.classList.toggle('active', el.id === `view-${view}`));
+  $$('.nav-item').forEach((el) => el.classList.toggle('active', el.dataset.viewLink === view));
+  $('#pageCrumb').textContent = viewNames[view];
+  $('.sidebar').classList.remove('open');
+  window.history.replaceState(null, '', `#${view}`);
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+  if (view === 'network') loadNetwork();
+  if (view === 'arena' && !state.game) newGame();
+  if (view === 'models') renderModels();
+}
+
+async function loadDashboard(silent = false) {
+  try {
+    const payload = await api('/api/dashboard');
+    state.dashboard = payload.summary;
+    state.datasets = payload.datasets;
+    state.models = payload.models;
+    state.training = payload.training;
+    renderDashboard();
+    renderDatasets();
+    renderTrainingDatasets();
+    renderModels();
+    renderTraining(payload.training);
+    if (!silent) toast('Laboratório sincronizado.');
+  } catch (error) {
+    toast(error.message, 'error');
+  }
+}
+
+function resultPills(results = {}) {
+  return `<span class="result-pills"><i>${results['1-0'] || 0} W</i><i>${results['0-1'] || 0} B</i><i>${results['1/2-1/2'] || 0} D</i></span>`;
+}
+
+function renderDashboard() {
+  const summary = state.dashboard || {};
+  $('#statGames').textContent = formatNumber(summary.games);
+  $('#statPositions').textContent = formatNumber(summary.positions);
+  $('#statModels').textContent = formatNumber(summary.models);
+  $('#statParameters').textContent = formatNumber(summary.parameters);
+  $('#sideModelName').textContent = summary.active_model || 'Aurora';
+  $('#sideModelMeta').textContent = `${formatNumber(summary.trained_positions)} posições · CPU`;
+  $('#opponentName').textContent = summary.active_model || 'Aurora';
+  const rows = state.datasets.slice(0, 4).map((dataset) => `<tr>
+    <td><strong>${escapeHtml(dataset.name)}</strong><small>${escapeHtml((dataset.players || []).slice(0, 2).join(' × '))}</small></td>
+    <td>${dataset.games}</td><td>${formatNumber(dataset.positions)}</td><td>${resultPills(dataset.results)}</td><td>${ago(dataset.imported_at)}</td>
+  </tr>`).join('');
+  $('#recentDatasets').innerHTML = rows || '<tr><td colspan="5">Nenhum PGN importado ainda.</td></tr>';
+  drawMetricChart($('#overviewChart'), state.training?.metrics || []);
+}
+
+function escapeHtml(value = '') {
+  return String(value).replace(/[&<>'"]/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[char]));
+}
+
+function drawMetricChart(canvas, metrics) {
+  const valid = metrics.filter((m) => Number.isFinite(Number(m.loss)));
+  $('#chartEmpty').classList.toggle('hidden', valid.length > 1);
+  if (valid.length < 2) return;
+  const rect = canvas.getBoundingClientRect();
+  const scale = window.devicePixelRatio || 1;
+  canvas.width = rect.width * scale; canvas.height = rect.height * scale;
+  const ctx = canvas.getContext('2d'); ctx.scale(scale, scale);
+  const w = rect.width, h = rect.height, pad = 24;
+  const values = valid.map((m) => Number(m.loss));
+  const min = Math.min(...values), max = Math.max(...values, min + 0.001);
+  ctx.clearRect(0, 0, w, h);
+  ctx.strokeStyle = 'rgba(230,240,232,.06)'; ctx.lineWidth = 1;
+  for (let i = 0; i < 5; i += 1) { const y = pad + (h - pad * 2) * i / 4; ctx.beginPath(); ctx.moveTo(pad, y); ctx.lineTo(w - pad, y); ctx.stroke(); }
+  const points = values.map((value, index) => ({ x: pad + (w - pad * 2) * index / (values.length - 1), y: pad + (h - pad * 2) * (max - value) / (max - min) }));
+  const gradient = ctx.createLinearGradient(0, pad, 0, h); gradient.addColorStop(0, 'rgba(134,231,184,.18)'); gradient.addColorStop(1, 'rgba(134,231,184,0)');
+  ctx.beginPath(); ctx.moveTo(points[0].x, h - pad); points.forEach((p) => ctx.lineTo(p.x, p.y)); ctx.lineTo(points.at(-1).x, h - pad); ctx.fillStyle = gradient; ctx.fill();
+  ctx.beginPath(); points.forEach((p, i) => i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y)); ctx.strokeStyle = '#86e7b8'; ctx.lineWidth = 2; ctx.stroke();
+  points.forEach((p) => { ctx.beginPath(); ctx.arc(p.x, p.y, 3, 0, Math.PI * 2); ctx.fillStyle = '#0d1411'; ctx.fill(); ctx.strokeStyle = '#86e7b8'; ctx.stroke(); });
+}
+
+function renderDatasets(filter = '') {
+  const needle = filter.toLowerCase();
+  const items = state.datasets.filter((d) => `${d.name} ${(d.players || []).join(' ')}`.toLowerCase().includes(needle));
+  $('#datasetCount').textContent = `${state.datasets.length} conjunto${state.datasets.length === 1 ? '' : 's'}`;
+  $('#datasetGrid').innerHTML = items.map((dataset) => `<article class="dataset-card">
+    <div class="file-top"><span class="file-icon">PGN</span><span class="file-size">${formatBytes(dataset.size)}</span></div>
+    <h3 title="${escapeHtml(dataset.name)}">${escapeHtml(dataset.name)}</h3>
+    <p title="${escapeHtml((dataset.players || []).join(', '))}">${escapeHtml((dataset.players || []).join(' · '))}</p>
+    <div class="dataset-metrics"><span><small>PARTIDAS</small><strong>${dataset.games}</strong></span><span><small>POSIÇÕES</small><strong>${formatNumber(dataset.positions)}</strong></span></div>
+  </article>`).join('') || '<div class="empty-library">Nenhum conjunto encontrado.</div>';
+}
+
+function renderTrainingDatasets() {
+  $('#trainingDatasets').innerHTML = state.datasets.map((dataset) => `<label class="dataset-check"><input type="checkbox" name="dataset_ids" value="${dataset.id}" checked><span>${escapeHtml(dataset.name)}</span><small>${dataset.games} partidas</small></label>`).join('') || '<div class="empty-library">Importe um PGN para usar imitação.</div>';
+}
+
+async function uploadFiles(files) {
+  const pgns = [...files].filter((file) => file.name.toLowerCase().endsWith('.pgn'));
+  if (!pgns.length) return toast('Escolha arquivos com extensão .pgn.', 'error');
+  const zone = $('#uploadZone'); zone.classList.add('uploading');
+  const form = new FormData(); pgns.forEach((file) => form.append('files', file));
+  try {
+    const payload = await api('/api/datasets/import', { method: 'POST', body: form });
+    toast(`${payload.datasets.length} arquivo(s) importado(s) com sucesso.`);
+    await loadDashboard(true);
+  } catch (error) { toast(error.message, 'error'); }
+  finally { zone.classList.remove('uploading'); $('#pgnInput').value = ''; }
+}
+
+function trainingConfig(form) {
+  const data = new FormData(form);
+  return {
+    name: data.get('name'), mode: data.get('mode'), hidden_layers: data.get('hidden_layers'), seed: Number(data.get('seed')),
+    epochs: Number(data.get('epochs')), batch_size: Number(data.get('batch_size')), learning_rate: Number(data.get('learning_rate')),
+    selfplay_episodes: Number(data.get('selfplay_episodes')), temperature: Number(data.get('temperature')),
+    max_positions: Number(data.get('max_positions')), dataset_ids: data.getAll('dataset_ids'),
+  };
+}
+
+async function startTraining(event) {
+  event.preventDefault();
+  try {
+    const payload = await api('/api/training/start', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(trainingConfig(event.currentTarget)) });
+    state.training = payload.training; renderTraining(payload.training); toast('Experimento iniciado.');
+  } catch (error) { toast(error.message, 'error'); }
+}
+
+function renderTraining(training) {
+  if (!training) return;
+  const running = !!training.running;
+  $('.monitor-card').classList.toggle('running', running);
+  $('#trainingStage').textContent = String(training.stage || 'Pronto').toUpperCase();
+  $('#trainingHeadline').textContent = running ? (training.config?.name || 'Treinando') : training.stage === 'Concluído' ? 'Checkpoint pronto' : training.stage === 'Falha' ? 'Algo precisa de atenção' : 'Aguardando configuração';
+  $('#trainingSubline').textContent = training.error || (running ? 'Atualizando pesos no laboratório local.' : training.model_id ? `Salvo como ${training.model_id}` : 'Escolha os parâmetros e inicie quando estiver pronto.');
+  $('#trainingProgress').style.width = `${training.progress || 0}%`;
+  $('#sideProgress').style.width = `${training.progress || 0}%`;
+  $('#progressValue').textContent = `${training.progress || 0}%`;
+  $('#lossValue').textContent = training.loss == null ? '—' : Number(training.loss).toFixed(4);
+  $('#epochValue').textContent = training.epoch || '—';
+  $('#stopTrainingButton').classList.toggle('hidden', !running);
+  $('#startTrainingButton').disabled = running;
+  $('#trainingConsole').innerHTML = (training.logs || []).map((log) => `<p><time>${escapeHtml(log.time)}</time>${escapeHtml(log.message)}</p>`).join('');
+  drawMetricChart($('#overviewChart'), training.metrics || []);
+}
+
+async function pollTraining() {
+  try {
+    const payload = await api('/api/training/status');
+    const wasRunning = state.training?.running;
+    state.training = payload.training;
+    renderTraining(payload.training);
+    if (wasRunning && !payload.training.running) {
+      await loadDashboard(true);
+      toast(payload.training.error ? payload.training.error : 'Treinamento concluído e checkpoint salvo.', payload.training.error ? 'error' : 'success');
+    }
+  } catch (_) { /* transient server restart */ }
+}
+
+function parseFen(fen) {
+  const board = {};
+  const rows = fen.split(' ')[0].split('/');
+  rows.forEach((row, rowIndex) => {
+    let file = 0;
+    for (const char of row) {
+      if (/\d/.test(char)) file += Number(char);
+      else { board[`${'abcdefgh'[file]}${8 - rowIndex}`] = char; file += 1; }
+    }
+  });
+  return board;
+}
+
+function renderBoard() {
+  const board = parseFen(state.game?.fen || '8/8/8/8/8/8/8/8 w - - 0 1');
+  const files = state.color === 'white' ? [...'abcdefgh'] : [...'hgfedcba'];
+  const ranks = state.color === 'white' ? [8, 7, 6, 5, 4, 3, 2, 1] : [1, 2, 3, 4, 5, 6, 7, 8];
+  const targets = state.selected ? (state.game?.legal_moves || []).filter((m) => m.startsWith(state.selected)).map((m) => m.slice(2, 4)) : [];
+  $('#chessboard').innerHTML = ranks.flatMap((rank, row) => files.map((file, col) => {
+    const square = `${file}${rank}`, piece = board[square], isLight = (file.charCodeAt(0) - 97 + rank) % 2 === 1;
+    const classes = ['square', isLight ? 'light' : 'dark', state.selected === square ? 'selected' : '', targets.includes(square) ? 'target' : '', piece ? 'has-piece' : '', state.lastMove?.includes(square) ? 'last' : ''].filter(Boolean).join(' ');
+    const showCoord = col === 0 || row === 7;
+    return `<button class="${classes}" data-square="${square}" data-coord="${showCoord ? square : ''}" aria-label="${square}">${piece ? `<img class="piece" draggable="false" src="/static/assets/pieces/${pieceFiles[piece]}" alt="${piece}">` : ''}</button>`;
+  })).join('');
+  $$('.square').forEach((el) => el.addEventListener('click', () => selectSquare(el.dataset.square, board)));
+}
+
+function selectSquare(square, board) {
+  if (!state.game || state.game.game_over) return;
+  const userTurn = (state.game.turn === 'white') === (state.color === 'white');
+  if (!userTurn) return;
+  if (state.selected) {
+    const candidates = state.game.legal_moves.filter((move) => move.startsWith(state.selected + square));
+    if (candidates.length) { playMove(candidates.find((m) => m.endsWith('q')) || candidates[0]); return; }
+  }
+  const piece = board[square];
+  const own = piece && ((piece === piece.toUpperCase()) === (state.color === 'white'));
+  state.selected = own ? square : null;
+  renderBoard();
+}
+
+async function newGame() {
+  try {
+    const payload = await api('/api/play/new', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ color: state.color }) });
+    state.game = payload.game; state.selected = null; state.moves = []; state.lastMove = payload.game.ai_move;
+    if (payload.game.ai_move) state.moves.push(payload.game.ai_move);
+    $('#playerColor').textContent = state.color === 'white' ? 'brancas' : 'pretas';
+    renderBoard(); renderMoveLog(); updateGameStatus();
+  } catch (error) { toast(error.message, 'error'); }
+}
+
+async function playMove(move) {
+  const ownMove = move; state.selected = null;
+  try {
+    const payload = await api('/api/play/move', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ session_id: state.game.session_id, move }) });
+    state.game = payload.game; state.moves.push(ownMove); if (payload.game.ai_move) state.moves.push(payload.game.ai_move);
+    state.lastMove = payload.game.ai_move || ownMove; renderBoard(); renderMoveLog(); updateGameStatus();
+  } catch (error) { toast(error.message, 'error'); renderBoard(); }
+}
+
+function renderMoveLog() {
+  if (!state.moves.length) { $('#moveLog').innerHTML = '<div class="empty-state"><span>♙</span><p>Os lances aparecerão aqui.</p></div>'; return; }
+  const rows = [];
+  for (let i = 0; i < state.moves.length; i += 2) rows.push(`<div class="move-row"><span>${i / 2 + 1}.</span><b>${state.moves[i] || ''}</b><b>${state.moves[i + 1] || ''}</b></div>`);
+  $('#moveLog').innerHTML = rows.join(''); $('#moveLog').scrollTop = $('#moveLog').scrollHeight;
+}
+
+function updateGameStatus() {
+  const game = state.game;
+  $('#gameState').textContent = game?.game_over ? (game.result || 'FIM') : game?.check ? 'XEQUE' : 'EM JOGO';
+  $('#gameHint').textContent = game?.game_over ? `Resultado ${game.result}` : game?.ai_move ? `Rede jogou ${game.ai_move}` : 'Sua vez';
+}
+
+async function loadNetwork() {
+  try {
+    const fen = state.game?.fen ? `?fen=${encodeURIComponent(state.game.fen)}` : '';
+    const payload = await api(`/api/network${fen}`); state.network = payload.network;
+    const layerSizes = payload.network.layers.map((layer) => layer.total);
+    $('#networkArchitecture').textContent = layerSizes.join(' → ');
+    $('#networkParameters').textContent = formatNumber(payload.network.parameters);
+    $('#networkPositions').textContent = formatNumber(payload.network.trained_positions);
+    drawNetwork();
+  } catch (error) { toast(error.message, 'error'); }
+}
+
+function drawNetwork() {
+  if (!state.network) return;
+  const canvas = $('#networkCanvas'), rect = canvas.getBoundingClientRect(), scale = window.devicePixelRatio || 1;
+  canvas.width = rect.width * scale; canvas.height = rect.height * scale;
+  const ctx = canvas.getContext('2d'); ctx.scale(scale, scale); ctx.clearRect(0, 0, rect.width, rect.height);
+  const padX = Math.max(55, rect.width * .07), padY = 65;
+  const positions = new Map(); state.networkNodes = [];
+  state.network.layers.forEach((layer, layerIndex) => {
+    const x = padX + (rect.width - padX * 2) * layerIndex / Math.max(1, state.network.layers.length - 1);
+    layer.nodes.forEach((node, nodeIndex) => {
+      const y = padY + (rect.height - padY * 2) * (nodeIndex + .5) / layer.nodes.length;
+      positions.set(node.id, { x, y, node, layer: layer.name });
+    });
+  });
+  state.network.edges.forEach((edge) => {
+    const a = positions.get(edge.source), b = positions.get(edge.target); if (!a || !b) return;
+    const magnitude = Math.min(1, Math.abs(edge.weight) * 7);
+    ctx.beginPath(); ctx.moveTo(a.x, a.y); const dx = (b.x - a.x) * .48; ctx.bezierCurveTo(a.x + dx, a.y, b.x - dx, b.y, b.x, b.y);
+    ctx.strokeStyle = edge.weight >= 0 ? `rgba(134,231,184,${.035 + magnitude * .22})` : `rgba(168,137,232,${.035 + magnitude * .22})`;
+    ctx.lineWidth = .3 + magnitude * 1.25; ctx.stroke();
+  });
+  state.network.layers.forEach((layer, layerIndex) => {
+    const sample = positions.get(layer.nodes[0]?.id); if (!sample) return;
+    ctx.fillStyle = '#78857c'; ctx.font = '500 9px "DM Mono"'; ctx.textAlign = 'center';
+    ctx.fillText(layer.name.toUpperCase(), sample.x, 29); ctx.fillStyle = '#4f5c54'; ctx.fillText(`${layer.total} NÓS`, sample.x, 44);
+    layer.nodes.forEach((node) => {
+      const p = positions.get(node.id), activation = Math.min(1, Math.abs(node.activation) / 2), radius = 3.3 + activation * 4.5;
+      ctx.beginPath(); ctx.arc(p.x, p.y, radius + 4, 0, Math.PI * 2); ctx.fillStyle = `rgba(134,231,184,${activation * .09})`; ctx.fill();
+      ctx.beginPath(); ctx.arc(p.x, p.y, radius, 0, Math.PI * 2); ctx.fillStyle = activation > .35 ? '#86e7b8' : '#22342a'; ctx.fill(); ctx.strokeStyle = 'rgba(134,231,184,.45)'; ctx.lineWidth = 1; ctx.stroke();
+      state.networkNodes.push({ ...p, radius: radius + 7 });
+    });
+  });
+}
+
+function networkHover(event) {
+  const rect = event.currentTarget.getBoundingClientRect(), x = event.clientX - rect.left, y = event.clientY - rect.top;
+  const found = state.networkNodes.find((p) => Math.hypot(x - p.x, y - p.y) <= p.radius), tip = $('#networkTooltip');
+  if (!found) { tip.style.display = 'none'; return; }
+  tip.style.display = 'block'; tip.style.left = `${Math.min(rect.width - 170, x + 12)}px`; tip.style.top = `${Math.max(12, y - 18)}px`;
+  tip.innerHTML = `${escapeHtml(found.layer)} · #${found.node.index}<br>ativação ${found.node.activation.toFixed(4)}`;
+}
+
+function renderModels() {
+  $('#modelGrid').innerHTML = state.models.map((model) => {
+    const config = model.config || {}, evaluation = model.evaluation || {};
+    return `<article class="model-card ${model.active ? 'active' : ''}"><div class="model-top"><span class="file-icon">NPZ</span>${model.active ? '<span class="model-badge">ATIVO</span>' : `<span class="file-size">${formatBytes(model.size)}</span>`}</div><h3>${escapeHtml(config.name || model.id)}</h3><p>${escapeHtml(model.id)} · ${ago(model.created_at)}</p><div class="model-score"><span><small>REGIME</small><strong>${escapeHtml(config.mode || '—')}</strong></span><span><small>ACURÁCIA TESTE</small><strong>${((evaluation.test_policy_accuracy || 0) * 100).toFixed(1)}%</strong></span><span><small>PARÂMETROS</small><strong>${formatNumber(evaluation.parameters)}</strong></span></div><div class="model-actions"><button data-load-model="${model.id}" ${model.active ? 'disabled' : ''}>${model.active ? 'Em uso' : 'Carregar'}</button><a href="/api/models/${model.id}/download">Exportar .npz</a></div></article>`;
+  }).join('') || '<div class="empty-library">Nenhum checkpoint ainda. Seu primeiro modelo aparecerá aqui.</div>';
+  $$('[data-load-model]').forEach((button) => button.addEventListener('click', () => loadModel(button.dataset.loadModel)));
+}
+
+async function loadModel(id) {
+  try { await api(`/api/models/${encodeURIComponent(id)}/load`, { method: 'POST' }); toast('Checkpoint carregado na arena.'); await loadDashboard(true); }
+  catch (error) { toast(error.message, 'error'); }
+}
+
+function wireEvents() {
+  $$('[data-view-link]').forEach((button) => button.addEventListener('click', (event) => { event.preventDefault(); changeView(button.dataset.viewLink); }));
+  $('.mobile-menu').addEventListener('click', () => $('.sidebar').classList.toggle('open'));
+  $('#refreshButton').addEventListener('click', () => loadDashboard());
+  $('#browsePgn').addEventListener('click', () => $('#pgnInput').click());
+  $('#pgnInput').addEventListener('change', (event) => uploadFiles(event.target.files));
+  const zone = $('#uploadZone');
+  ['dragenter', 'dragover'].forEach((name) => zone.addEventListener(name, (event) => { event.preventDefault(); zone.classList.add('dragging'); }));
+  ['dragleave', 'drop'].forEach((name) => zone.addEventListener(name, (event) => { event.preventDefault(); zone.classList.remove('dragging'); }));
+  zone.addEventListener('drop', (event) => uploadFiles(event.dataTransfer.files));
+  $('#datasetSearch').addEventListener('input', (event) => renderDatasets(event.target.value));
+  $('#trainingForm').addEventListener('submit', startTraining);
+  $('#stopTrainingButton').addEventListener('click', async () => { try { await api('/api/training/stop', { method: 'POST' }); toast('Parada segura solicitada.'); } catch (error) { toast(error.message, 'error'); } });
+  $('#newGameButton').addEventListener('click', newGame);
+  $$('#colorChoice button').forEach((button) => button.addEventListener('click', () => { state.color = button.dataset.color; $$('#colorChoice button').forEach((b) => b.classList.toggle('active', b === button)); newGame(); }));
+  $('#refreshNetwork').addEventListener('click', loadNetwork);
+  $('#networkCanvas').addEventListener('mousemove', networkHover);
+  $('#networkCanvas').addEventListener('mouseleave', () => $('#networkTooltip').style.display = 'none');
+  window.addEventListener('resize', () => { drawMetricChart($('#overviewChart'), state.training?.metrics || []); if (state.view === 'network') drawNetwork(); });
+}
+
+wireEvents();
+changeView(location.hash.slice(1) || 'overview');
+loadDashboard(true);
+setInterval(pollTraining, 1400);

@@ -1,0 +1,128 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#0b100e">
+  <title>ChessLab AI — laboratório de xadrez neural</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Manrope:wght@400;500;600;700&family=Playfair+Display:ital,wght@0,600;1,600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/app.css') }}">
+</head>
+<body>
+  <div class="ambient ambient-one"></div><div class="ambient ambient-two"></div>
+  <div class="app-shell">
+    <aside class="sidebar">
+      <a class="brand" href="#overview" data-view-link="overview" aria-label="ChessLab AI">
+        <span class="brand-mark">♞</span>
+        <span><strong>ChessLab</strong><small>NEURAL STUDIO</small></span>
+      </a>
+      <nav class="main-nav" aria-label="Navegação principal">
+        <button class="nav-item active" data-view-link="overview"><span>◫</span> Visão geral</button>
+        <button class="nav-item" data-view-link="arena"><span>♙</span> Arena</button>
+        <button class="nav-item" data-view-link="training"><span>⌁</span> Treinamento</button>
+        <button class="nav-item" data-view-link="datasets"><span>▱</span> Dados PGN</button>
+        <button class="nav-item" data-view-link="network"><span>✣</span> Rede neural</button>
+        <button class="nav-item" data-view-link="models"><span>◇</span> Modelos</button>
+      </nav>
+      <div class="side-status">
+        <div class="status-head"><span class="live-dot"></span><span>MODELO ATIVO</span></div>
+        <strong id="sideModelName">Aurora</strong>
+        <small id="sideModelMeta">não treinado · CPU</small>
+        <div class="mini-progress"><i id="sideProgress"></i></div>
+      </div>
+      <button class="sidebar-collapse" aria-label="Recolher menu">‹</button>
+    </aside>
+
+    <main>
+      <header class="topbar">
+        <button class="mobile-menu" aria-label="Abrir menu">☰</button>
+        <div class="breadcrumb"><span>CHESSLAB</span><i>/</i><strong id="pageCrumb">VISÃO GERAL</strong></div>
+        <div class="top-actions">
+          <span class="system-chip"><i></i>Sistema pronto</span>
+          <button class="icon-button" id="refreshButton" title="Atualizar">↻</button>
+          <button class="primary small" data-view-link="training">+ Novo treino</button>
+        </div>
+      </header>
+
+      <section class="view active" id="view-overview">
+        <div class="page-heading hero-heading">
+          <div><span class="eyebrow">LABORATÓRIO PARTICULAR</span><h1>Ensine a máquina a <em>pensar.</em></h1><p>Importe partidas, refine uma política neural e acompanhe cada sinapse — lance a lance.</p></div>
+          <button class="primary" data-view-link="training"><span>▶</span> Iniciar treinamento</button>
+        </div>
+        <div class="stats-grid">
+          <article class="stat-card"><span class="stat-icon mint">♟</span><div><small>PARTIDAS IMPORTADAS</small><strong id="statGames">—</strong><p>base de conhecimento</p></div></article>
+          <article class="stat-card"><span class="stat-icon violet">⌗</span><div><small>POSIÇÕES DE TREINO</small><strong id="statPositions">—</strong><p>exemplos supervisionados</p></div></article>
+          <article class="stat-card"><span class="stat-icon amber">◇</span><div><small>CHECKPOINTS</small><strong id="statModels">—</strong><p>modelos versionados</p></div></article>
+          <article class="stat-card"><span class="stat-icon blue">✣</span><div><small>PARÂMETROS ATIVOS</small><strong id="statParameters">—</strong><p>pesos inspecionáveis</p></div></article>
+        </div>
+        <div class="overview-grid">
+          <article class="panel chart-panel">
+            <div class="panel-head"><div><span class="eyebrow">TELEMETRIA</span><h2>Curva de aprendizado</h2></div><span class="legend"><i></i>loss</span></div>
+            <canvas id="overviewChart"></canvas>
+            <div class="chart-empty" id="chartEmpty"><span>⌁</span><strong>A curva aparece durante o treino</strong><small>Comece um experimento para acompanhar a evolução.</small></div>
+          </article>
+          <article class="panel quick-panel">
+            <div class="panel-head"><div><span class="eyebrow">PRÓXIMOS PASSOS</span><h2>Fluxo recomendado</h2></div></div>
+            <button class="quick-step" data-view-link="datasets"><b>01</b><span><strong>Importe conhecimento</strong><small>PGNs com partidas de mestres</small></span><i>→</i></button>
+            <button class="quick-step" data-view-link="training"><b>02</b><span><strong>Configure o experimento</strong><small>Imitação, autojogo ou híbrido</small></span><i>→</i></button>
+            <button class="quick-step" data-view-link="network"><b>03</b><span><strong>Observe a mente</strong><small>Ativações e pesos em tempo real</small></span><i>→</i></button>
+          </article>
+        </div>
+        <article class="panel recent-panel">
+          <div class="panel-head"><div><span class="eyebrow">BIBLIOTECA</span><h2>Dados recentes</h2></div><button class="text-button" data-view-link="datasets">Ver todos →</button></div>
+          <div class="table-wrap"><table><thead><tr><th>CONJUNTO</th><th>PARTIDAS</th><th>POSIÇÕES</th><th>RESULTADOS</th><th>IMPORTADO</th></tr></thead><tbody id="recentDatasets"></tbody></table></div>
+        </article>
+      </section>
+
+      <section class="view" id="view-arena">
+        <div class="page-heading"><div><span class="eyebrow">CHAMPION / CHALLENGER</span><h1>Teste na <em>arena.</em></h1><p>Jogue contra o checkpoint ativo e inspecione como a política responde.</p></div><div class="segmented" id="colorChoice"><button class="active" data-color="white">Brancas</button><button data-color="black">Pretas</button></div></div>
+        <div class="arena-layout">
+          <div class="board-frame"><div class="board-top"><span><i class="avatar ai">AI</i><strong id="opponentName">Aurora</strong><small>rede ativa</small></span><span class="clock">∞</span></div><div id="chessboard" class="chessboard" aria-label="Tabuleiro de xadrez"></div><div class="board-bottom"><span><i class="avatar human">EU</i><strong>Você</strong><small id="playerColor">brancas</small></span><span class="clock">∞</span></div></div>
+          <aside class="panel game-panel"><div class="panel-head"><div><span class="eyebrow">PARTIDA ATUAL</span><h2>Console da arena</h2></div><span class="live-badge" id="gameState">AGUARDANDO</span></div><div class="game-eval"><span>PREVISÃO DA REDE</span><strong id="gameHint">Nova partida</strong><div class="eval-bar"><i></i></div></div><div class="move-log" id="moveLog"><div class="empty-state"><span>♙</span><p>Os lances aparecerão aqui.</p></div></div><button class="primary full" id="newGameButton">Nova partida</button><p class="fine-print">A rede só pode executar lances legais. Promoções usam dama por padrão.</p></aside>
+        </div>
+      </section>
+
+      <section class="view" id="view-training">
+        <div class="page-heading"><div><span class="eyebrow">EXPERIMENTO CONTROLADO</span><h1>Ateliê de <em>treinamento.</em></h1><p>Ajuste o regime, a arquitetura e o orçamento. Cada execução gera um manifesto reproduzível.</p></div></div>
+        <div class="training-layout">
+          <form class="panel config-panel" id="trainingForm">
+            <div class="panel-head"><div><span class="step-number">01</span><h2>Estratégia</h2></div></div>
+            <label>Nome do modelo<input name="name" value="Aurora" maxlength="40"></label>
+            <label>Regime de aprendizado<div class="mode-cards"><input type="radio" name="mode" id="modeHybrid" value="hybrid" checked><label for="modeHybrid"><i>✦</i><strong>Híbrido</strong><small>PGN + autojogo</small></label><input type="radio" name="mode" id="modeImitation" value="imitation"><label for="modeImitation"><i>◫</i><strong>Imitação</strong><small>Aprende dos mestres</small></label><input type="radio" name="mode" id="modeSelf" value="selfplay"><label for="modeSelf"><i>∞</i><strong>Autojogo</strong><small>Explora sozinho</small></label></div></label>
+            <div class="form-grid"><label>Camadas ocultas<input name="hidden_layers" value="96, 64" placeholder="96, 64"><small>8–256 neurônios por camada</small></label><label>Seed<input name="seed" type="number" value="42"></label><label>Épocas<input name="epochs" type="number" min="1" max="50" value="4"></label><label>Tamanho do lote<input name="batch_size" type="number" min="4" max="256" value="32"></label><label>Taxa de aprendizado<input name="learning_rate" type="number" min="0.00001" max="0.05" step="0.0001" value="0.001"></label><label>Episódios de autojogo<input name="selfplay_episodes" type="number" min="1" max="100" value="8"></label><label>Temperatura<input name="temperature" type="number" min="0.05" max="2" step="0.05" value="0.7"><small>maior = mais exploração</small></label><label>Limite de posições<input name="max_positions" type="number" min="64" max="100000" value="10000"></label></div>
+            <label>Conjuntos de dados<div id="trainingDatasets" class="dataset-checks"></div></label>
+            <button class="primary full" type="submit" id="startTrainingButton"><span>▶</span> Começar experimento</button>
+          </form>
+          <div class="training-monitor">
+            <article class="panel monitor-card"><div class="monitor-orbit"><div class="orbit one"></div><div class="orbit two"></div><span>♞</span></div><div class="monitor-copy"><span class="eyebrow" id="trainingStage">PRONTO</span><h2 id="trainingHeadline">Aguardando configuração</h2><p id="trainingSubline">Escolha os parâmetros e inicie quando estiver pronto.</p></div><div class="big-progress"><i id="trainingProgress"></i></div><div class="monitor-stats"><span><small>PROGRESSO</small><strong id="progressValue">0%</strong></span><span><small>LOSS</small><strong id="lossValue">—</strong></span><span><small>ÉPOCA</small><strong id="epochValue">—</strong></span></div><button class="danger-button hidden" id="stopTrainingButton">Parar com segurança</button></article>
+            <article class="panel console-panel"><div class="panel-head"><div><span class="eyebrow">EVENTOS</span><h2>Console de treinamento</h2></div><span class="console-dot"></span></div><div class="console" id="trainingConsole"><p><time>agora</time> Laboratório pronto para treinar.</p></div></article>
+          </div>
+        </div>
+      </section>
+
+      <section class="view" id="view-datasets">
+        <div class="page-heading"><div><span class="eyebrow">CONHECIMENTO ESPECIALISTA</span><h1>Biblioteca <em>PGN.</em></h1><p>Arraste arquivos com uma ou muitas partidas. Comentários, relógios e metadados são aceitos.</p></div></div>
+        <div class="upload-zone" id="uploadZone"><input type="file" id="pgnInput" accept=".pgn" multiple hidden><div class="upload-icon">⇧</div><h2>Solte seus arquivos .pgn aqui</h2><p>ou <button type="button" id="browsePgn">procure no computador</button></p><small>até 64 MB por envio · múltiplos arquivos permitidos</small><div class="upload-progress"><i></i></div></div>
+        <div class="library-head"><div><span class="eyebrow">CONJUNTOS IMPORTADOS</span><h2 id="datasetCount">0 conjuntos</h2></div><div class="search"><span>⌕</span><input id="datasetSearch" placeholder="Buscar jogador ou arquivo"></div></div>
+        <div class="dataset-grid" id="datasetGrid"></div>
+      </section>
+
+      <section class="view" id="view-network">
+        <div class="page-heading"><div><span class="eyebrow">RAIO-X DA POLÍTICA</span><h1>Dentro da <em>rede.</em></h1><p>Uma amostra navegável dos neurônios mais ativos e das conexões entre camadas.</p></div><button class="secondary" id="refreshNetwork">↻ Atualizar ativações</button></div>
+        <div class="network-stats"><span><small>ARQUITETURA</small><strong id="networkArchitecture">—</strong></span><span><small>PARÂMETROS</small><strong id="networkParameters">—</strong></span><span><small>POSIÇÕES VISTAS</small><strong id="networkPositions">—</strong></span><span><small>VISUALIZAÇÃO</small><strong>amostra top-k</strong></span></div>
+        <article class="panel network-panel"><div class="network-key"><span><i class="positive"></i> peso positivo</span><span><i class="negative"></i> peso negativo</span><span><i class="node-key"></i> ativação</span></div><canvas id="networkCanvas"></canvas><div class="network-tooltip" id="networkTooltip"></div></article>
+        <div class="insight-grid"><article class="panel insight"><span class="insight-icon">◉</span><div><small>COMO LER</small><h3>Brilho é ativação</h3><p>Nós maiores e luminosos estão respondendo mais à posição atual.</p></div></article><article class="panel insight"><span class="insight-icon">⌁</span><div><small>CONEXÕES</small><h3>Cor é direção</h3><p>Verde reforça; violeta inibe. A espessura representa a magnitude do peso.</p></div></article><article class="panel insight"><span class="insight-icon">◇</span><div><small>TRANSPARÊNCIA</small><h3>Uma amostra honesta</h3><p>A tela exibe os neurônios top-k; o contador inclui todos os parâmetros.</p></div></article></div>
+      </section>
+
+      <section class="view" id="view-models">
+        <div class="page-heading"><div><span class="eyebrow">COFRE DE CHECKPOINTS</span><h1>Seus <em>modelos.</em></h1><p>Carregue uma versão anterior, compare a avaliação e exporte o arquivo portátil.</p></div></div>
+        <div class="model-grid" id="modelGrid"></div>
+      </section>
+    </main>
+  </div>
+  <div class="toast-stack" id="toastStack"></div>
+  <script src="{{ url_for('static', filename='js/app.js') }}"></script>
+</body>
+</html>

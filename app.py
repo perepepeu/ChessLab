@@ -1,0 +1,154 @@
+from __future__ import annotations
+
+import uuid
+from pathlib import Path
+
+import chess
+from flask import Flask, jsonify, render_template, request, send_file
+
+from chesslab.data import DatasetStore
+from chesslab.training import TrainingManager
+
+
+ROOT = Path(__file__).resolve().parent
+app = Flask(__name__)
+app.config["MAX_CONTENT_LENGTH"] = 64 * 1024 * 1024
+datasets = DatasetStore(ROOT / "data")
+trainer = TrainingManager(ROOT, datasets)
+games: dict[str, chess.Board] = {}
+
+
+def ok(**payload):
+    return jsonify({"ok": True, **payload})
+
+
+@app.errorhandler(Exception)
+def handle_error(error):
+    code = getattr(error, "code", 400)
+    return jsonify({"ok": False, "error": str(error)}), code if isinstance(code, int) else 400
+
+
+@app.get("/")
+def index():
+    return render_template("index.html")
+
+
+@app.get("/api/dashboard")
+def dashboard():
+    items = datasets.list()
+    models = trainer.list_models()
+    return ok(datasets=items, models=models, training=trainer.status(), summary={
+        "games": sum(d["games"] for d in items), "positions": sum(d["positions"] for d in items),
+        "models": len(models), "active_model": trainer.model.name,
+        "parameters": trainer.model.parameter_count, "trained_positions": trainer.model.trained_positions,
+    })
+
+
+@app.get("/api/datasets")
+def list_datasets():
+    return ok(datasets=datasets.list())
+
+
+@app.post("/api/datasets/import")
+def import_dataset():
+    files = request.files.getlist("files")
+    if not files:
+        raise ValueError("Selecione pelo menos um arquivo .pgn.")
+    imported = []
+    for file in files:
+        if not (file.filename or "").lower().endswith(".pgn"):
+            raise ValueError(f"{file.filename}: somente arquivos .pgn são aceitos.")
+        imported.append(datasets.register_upload(file))
+    return ok(datasets=imported)
+
+
+@app.post("/api/training/start")
+def start_training():
+    return ok(training=trainer.start(request.get_json(force=True) or {}))
+
+
+@app.get("/api/training/status")
+def training_status():
+    return ok(training=trainer.status())
+
+
+@app.post("/api/training/stop")
+def stop_training():
+    trainer.stop()
+    return ok(training=trainer.status())
+
+
+@app.get("/api/models")
+def list_models():
+    return ok(models=trainer.list_models())
+
+
+@app.post("/api/models/<model_id>/load")
+def load_model(model_id):
+    return ok(model=trainer.load_model(model_id))
+
+
+@app.get("/api/models/<model_id>/download")
+def download_model(model_id):
+    path = ROOT / "models" / f"{Path(model_id).name}.npz"
+    if not path.exists():
+        raise ValueError("Checkpoint não encontrado.")
+    return send_file(path, as_attachment=True, download_name=path.name)
+
+
+@app.get("/api/network")
+def network():
+    fen = request.args.get("fen")
+    board = chess.Board(fen) if fen else chess.Board()
+    return ok(network=trainer.model.snapshot(board), model={"name": trainer.model.name, "id": trainer.active_model_id})
+
+
+def board_payload(board: chess.Board, session_id: str, ai_move: str | None = None):
+    outcome = board.outcome(claim_draw=True)
+    return {"session_id": session_id, "fen": board.fen(), "turn": "white" if board.turn else "black",
+            "legal_moves": [m.uci() for m in board.legal_moves], "ai_move": ai_move,
+            "game_over": board.is_game_over(claim_draw=True), "result": outcome.result() if outcome else None,
+            "check": board.is_check()}
+
+
+@app.post("/api/play/new")
+def new_game():
+    body = request.get_json(silent=True) or {}
+    color = body.get("color", "white")
+    session_id = uuid.uuid4().hex
+    board = chess.Board()
+    games[session_id] = board
+    ai_move = None
+    if color == "black":
+        move = trainer.model.choose_move(board)
+        if move:
+            board.push(move)
+            ai_move = move.uci()
+    return ok(game=board_payload(board, session_id, ai_move))
+
+
+@app.post("/api/play/move")
+def play_move():
+    body = request.get_json(force=True)
+    session_id = body.get("session_id", "")
+    board = games.get(session_id)
+    if board is None:
+        raise ValueError("Partida expirada. Inicie uma nova partida.")
+    try:
+        move = chess.Move.from_uci(body.get("move", ""))
+    except ValueError as exc:
+        raise ValueError("Lance inválido.") from exc
+    if move not in board.legal_moves:
+        raise ValueError("Esse lance não é legal nesta posição.")
+    board.push(move)
+    ai_uci = None
+    if not board.is_game_over(claim_draw=True):
+        ai_move = trainer.model.choose_move(board)
+        if ai_move:
+            board.push(ai_move)
+            ai_uci = ai_move.uci()
+    return ok(game=board_payload(board, session_id, ai_uci))
+
+
+if __name__ == "__main__":
+    app.run(host="127.0.0.1", port=5000, debug=False, threaded=True)

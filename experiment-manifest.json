@@ -1,0 +1,47 @@
+{
+  "experiment_id": "chesslab-template-v1",
+  "hypothesis": "PGN imitation followed by bounded self-play improves held-out policy agreement over an untrained policy.",
+  "decision": "Promote a trained checkpoint to the local arena only after its held-out evaluation is recorded.",
+  "code_version": "local-workspace-v1",
+  "environment_version": "python-chess-standard-v1",
+  "evaluator_version": "heldout-policy-v1",
+  "data": {
+    "source": "user-supplied-pgn",
+    "period": "recorded-in-dataset-registry",
+    "hash": "computed-per-training-run",
+    "split_policy": "game-aware deterministic 70/15/15"
+  },
+  "runtime": {
+    "hardware": "local-cpu",
+    "software": "Python 3.13, NumPy, python-chess",
+    "numeric_precision": "fp32"
+  },
+  "seeds": [42, 43, 44],
+  "baseline": {
+    "name": "random-legal-policy",
+    "version": "v1"
+  },
+  "candidate": {
+    "name": "chesslab-policy-mlp",
+    "configuration": "captured-from-training-form",
+    "initial_checkpoint": "none"
+  },
+  "budget": {
+    "training_steps": 0,
+    "environment_interactions": 0,
+    "wall_clock_limit_minutes": 0
+  },
+  "evaluation": {
+    "primary_metric": "held-out-policy-agreement",
+    "held_out_suite": "pgn-game-split-v1",
+    "minimum_effect": 0.0,
+    "maximum_regression": 0.05,
+    "confidence_level": 0.95
+  },
+  "artifacts": {
+    "checkpoint_uri": "generated-in-models-directory",
+    "raw_results_uri": "generated-in-runs-directory",
+    "telemetry_uri": "generated-in-runs-directory"
+  }
+}
+

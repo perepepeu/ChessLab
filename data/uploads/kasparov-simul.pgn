@@ -1,0 +1,177 @@
+[Event "Kasparov Simul"]
+[Date "2025.10.21"]
+[Round "1"]
+[White "Kasparov, Garry"]
+[Black "Lucas Vermeulen"]
+[Result "1-0"]
+[Board "5"]
+[TimeControl "5400+0"]
+[WhiteFideId "4100018"]
+[WhiteTitle "GM"]
+[WhiteElo "2812"]
+[WhiteTeam "RUS"]
+[WhiteClock "0:00:00"]
+[BlackClock "0:00:00"]
+[Variant "Standard"]
+
+1. e4 {[%clk 1:30:00]}  d6 {[%clk 0:00:00]} 2. d4 {[%clk 1:30:00]}  c5 {[%clk 0:00:00]} 3. c3 {[%clk 1:29:57]}  Be6 {[%clk 0:00:00]} 4. Nf3 {[%clk 1:29:55]}  Na6 {[%clk 0:00:00]} 5. d5 {[%clk 1:29:51]}  Nh6 {[%clk 0:00:00]} 6. dxe6 {[%clk 0:00:00]}  fxe6 {[%clk 0:00:00]} 7. Bb5+ {[%clk 0:00:00]}  Kf7 {[%clk 0:00:00]} 8. Ng5+ {[%clk 0:00:00]}  Kf6 {[%clk 0:00:00]} 9. Qf3+ {[%clk 0:00:00]}  Ke5 {[%clk 0:00:00]} 10. Qf4# {[%clk 0:00:00]} 1-0
+
+
+
+
+
+[Event "Kasparov Simul"]
+[Date "2025.10.21"]
+[Round "1"]
+[White "Kasparov, Garry"]
+[Black "Marc Oosterlynck"]
+[Result "1-0"]
+[Board "14"]
+[TimeControl "5400+0"]
+[WhiteFideId "4100018"]
+[WhiteTitle "GM"]
+[WhiteElo "2812"]
+[WhiteTeam "RUS"]
+[WhiteClock "0:00:00"]
+[BlackClock "0:00:00"]
+[Variant "Standard"]
+
+1. d4 {[%clk 1:30:00]}  d6 {[%clk 0:00:00]} 2. e4 {[%clk 1:30:00]}  Nd7 {[%clk 0:00:00]} 3. Nf3 {[%clk 1:29:58]}  Ngf6 {[%clk 0:00:00]} 4. e5 {[%clk 1:29:54]}  Nd5 {[%clk 0:00:00]} 5. c4 {[%clk 1:29:52]}  dxe5 {[%clk 0:00:00]} 6. cxd5 {[%clk 0:00:00]}  e4 {[%clk 0:00:00]} 7. Ne5 {[%clk 0:00:00]}  f6 {[%clk 0:00:00]} 8. Qh5+ {[%clk 0:00:00]}  g6 {[%clk 0:00:00]} 9. Nxg6 {[%clk 0:00:00]}  e5 {[%clk 0:00:00]} 10. Nxe5+ {[%clk 0:00:00]}  Ke7 {[%clk 0:00:00]} 11. Qf7+ {[%clk 0:00:00]}  Kd6 {[%clk 0:00:00]} 12. Nc4# {[%clk 0:00:00]} 1-0
+
+
+
+
+
+[Event "Kasparov Simul"]
+[Date "2025.10.21"]
+[Round "1"]
+[White "Kasparov, Garry"]
+[Black "Ramacker, Nico"]
+[Result "1-0"]
+[Board "2"]
+[TimeControl "5400+0"]
+[WhiteFideId "4100018"]
+[BlackFideId "210390"]
+[WhiteTitle "GM"]
+[WhiteElo "2812"]
+[BlackElo "1855"]
+[WhiteTeam "RUS"]
+[BlackTeam "BEL"]
+[WhiteClock "0:00:00"]
+[BlackClock "0:00:00"]
+[Variant "Standard"]
+
+1. d4 {[%clk 1:30:00]}  d5 {[%clk 0:00:00]} 2. c4 {[%clk 1:29:58]}  dxc4 {[%clk 0:00:00]} 3. e3 {[%clk 1:29:58]}  a6 {[%clk 0:00:00]} 4. Bxc4 {[%clk 0:00:00]}  Nf6 {[%clk 0:00:00]} 5. Nf3 {[%clk 0:00:00]}  e6 {[%clk 0:00:00]} 6. Qe2 {[%clk 0:00:00]}  Be7 {[%clk 0:00:00]} 7. O-O {[%clk 0:00:00]}  O-O {[%clk 0:00:00]} 8. e4 {[%clk 0:00:00]}  b5 {[%clk 0:00:00]} 9. Bd3 {[%clk 0:00:00]}  c5 {[%clk 0:00:00]} 10. dxc5 {[%clk 0:00:00]}  Bxc5 {[%clk 0:00:00]} 11. e5 {[%clk 0:00:00]}  Nd5 {[%clk 0:00:00]} 12. Bxh7+ {[%clk 0:00:00]}  Kh8 {[%clk 0:00:00]} 13. Ng5 {[%clk 0:00:00]}  g6 {[%clk 0:00:00]} 14. Qe4 {[%clk 0:00:00]}  Kg7 {[%clk 0:00:00]} 15. Qh4 {[%clk 0:00:00]}  Rh8 {[%clk 0:00:00]} 16. Nxe6+ {[%clk 0:00:00]} 1-0
+
+
+
+
+
+[Event "Kasparov Simul"]
+[Date "2025.10.21"]
+[Round "1"]
+[White "Kasparov, Garry"]
+[Black "Floris Penninckx"]
+[Result "1-0"]
+[Board "1"]
+[TimeControl "5400+0"]
+[WhiteFideId "4100018"]
+[WhiteTitle "GM"]
+[WhiteElo "2812"]
+[WhiteTeam "RUS"]
+[WhiteClock "0:00:00"]
+[BlackClock "0:00:00"]
+[Variant "Standard"]
+
+1. e4 {[%clk 1:30:00]}  Nf6 {[%clk 0:00:00]} 2. e5 {[%clk 1:30:00]}  Nd5 {[%clk 0:00:00]} 3. d4 {[%clk 0:00:00]}  d6 {[%clk 0:00:00]} 4. Nf3 {[%clk 0:00:00]}  Nc6 {[%clk 0:00:00]} 5. c4 {[%clk 0:00:00]}  Nb6 {[%clk 0:00:00]} 6. e6 {[%clk 0:00:00]}  fxe6 {[%clk 0:00:00]} 7. Bd3 {[%clk 0:00:00]}  d5 {[%clk 0:00:00]} 8. c5 {[%clk 0:00:00]}  Nc4 {[%clk 0:00:00]} 9. b3 {[%clk 0:00:00]}  N4a5 {[%clk 0:00:00]} 10. Ng5 {[%clk 0:00:00]}  Nxd4 {[%clk 0:00:00]} 11. Bxh7 {[%clk 0:00:00]}  Rxh7 {[%clk 0:00:00]} 12. Nxh7 {[%clk 0:00:00]}  Nf5 {[%clk 0:00:00]} 13. Qh5+ {[%clk 0:00:00]}  Kd7 {[%clk 0:00:00]} 14. Qf7 {[%clk 0:00:00]}  Kc6 {[%clk 0:00:00]} 15. Nxf8 {[%clk 0:00:00]}  Nd4 {[%clk 0:00:00]} 16. Na3 {[%clk 0:00:00]}  b5 {[%clk 0:00:00]} 17. Bb2 {[%clk 0:00:00]}  Ba6 {[%clk 0:00:00]} 18. Ng6 {[%clk 0:00:00]}  e5 {[%clk 0:00:00]} 19. Nxe5+ {[%clk 0:00:00]} 1-0
+
+
+
+
+
+[Event "Kasparov Simul"]
+[Date "2025.10.21"]
+[Round "1"]
+[White "Kasparov, Garry"]
+[Black "Els van Doesburg"]
+[Result "1-0"]
+[Board "10"]
+[TimeControl "5400+0"]
+[WhiteFideId "4100018"]
+[WhiteTitle "GM"]
+[WhiteElo "2812"]
+[WhiteTeam "RUS"]
+[WhiteClock "0:00:00"]
+[BlackClock "0:00:00"]
+[Variant "Standard"]
+
+1. d4 {[%clk 1:30:00]}  d5 {[%clk 0:00:00]} 2. Bf4 {[%clk 1:29:59]}  Nf6 {[%clk 0:00:00]} 3. e3 {[%clk 1:29:59]}  Nc6 {[%clk 0:00:00]} 4. Nf3 {[%clk 0:00:00]}  a5 {[%clk 0:00:00]} 5. c4 {[%clk 0:00:00]}  dxc4 {[%clk 0:00:00]} 6. Bxc4 {[%clk 0:00:00]}  e6 {[%clk 0:00:00]} 7. O-O {[%clk 0:00:00]}  Be7 {[%clk 0:00:00]} 8. Nc3 {[%clk 0:00:00]}  O-O {[%clk 0:00:00]} 9. e4 {[%clk 0:00:00]}  b6 {[%clk 0:00:00]} 10. Rc1 {[%clk 0:00:00]}  Ba6 {[%clk 0:00:00]} 11. Bxa6 {[%clk 0:00:00]}  Rxa6 {[%clk 0:00:00]} 12. Qe2 {[%clk 0:00:00]}  Qc8 {[%clk 0:00:00]} 13. d5 {[%clk 0:00:00]}  Nb4 {[%clk 0:00:00]} 14. a3 {[%clk 0:00:00]}  Bc5 {[%clk 0:00:00]} 15. axb4 {[%clk 0:00:00]}  axb4 {[%clk 0:00:00]} 16. Nb5 {[%clk 0:00:00]}  c6 {[%clk 0:00:00]} 17. Nd6 {[%clk 0:00:00]}  Qc7 {[%clk 0:00:00]} 18. Qxa6 {[%clk 0:00:00]}  Bxd6 {[%clk 0:00:00]} 19. Rxc6 {[%clk 0:00:00]}  Qe7 {[%clk 0:00:00]} 20. Bxd6 {[%clk 0:00:00]}  Qe8 {[%clk 0:00:00]} 21. Bxf8 {[%clk 0:00:00]} 1-0
+
+
+
+
+
+[Event "Kasparov Simul"]
+[Date "2025.10.21"]
+[Round "1"]
+[White "Kasparov, Garry"]
+[Black "Dries Buytaert"]
+[Result "1-0"]
+[Board "15"]
+[TimeControl "5400+0"]
+[WhiteFideId "4100018"]
+[WhiteTitle "GM"]
+[WhiteElo "2812"]
+[WhiteTeam "RUS"]
+[WhiteClock "0:00:00"]
+[BlackClock "0:00:00"]
+[Variant "Standard"]
+
+1. e4 {[%clk 1:30:00]}  c6 {[%clk 0:00:00]} 2. d4 {[%clk 1:29:58]}  d5 {[%clk 0:00:00]} 3. e5 {[%clk 1:29:58]}  Bf5 {[%clk 0:00:00]} 4. h4 {[%clk 1:29:50]}  h5 {[%clk 0:00:00]} 5. c4 {[%clk 1:29:47]}  e6 {[%clk 0:00:00]} 6. Nc3 {[%clk 0:00:00]}  Bb4 {[%clk 0:00:00]} 7. Qb3 {[%clk 0:00:00]}  Bxc3+ {[%clk 0:00:00]} 8. bxc3 {[%clk 0:00:00]}  Qc7 {[%clk 0:00:00]} 9. Ba3 {[%clk 0:00:00]}  Nd7 {[%clk 0:00:00]} 10. Nf3 {[%clk 0:00:00]}  Rb8 {[%clk 0:00:00]} 11. Bd6 {[%clk 0:00:00]}  Qc8 {[%clk 0:00:00]} 12. Bxb8 {[%clk 0:00:00]}  Qxb8 {[%clk 0:00:00]} 13. cxd5 {[%clk 0:00:00]}  exd5 {[%clk 0:00:00]} 14. c4 {[%clk 0:00:00]}  Ne7 {[%clk 0:00:00]} 15. Bd3 {[%clk 0:00:00]}  Bxd3 {[%clk 0:00:00]} 16. Qxd3 {[%clk 0:00:00]}  dxc4 {[%clk 0:00:00]} 17. Qxc4 {[%clk 0:00:00]}  Nb6 {[%clk 0:00:00]} 18. Qc2 {[%clk 0:00:00]}  Qc8 {[%clk 0:00:00]} 19. Kf1 {[%clk 0:00:00]}  Qd7 {[%clk 0:00:00]} 20. Re1 {[%clk 0:00:00]}  Kd8 {[%clk 0:00:00]} 21. Ng5 {[%clk 0:00:00]}  Qd5 {[%clk 0:00:00]} 22. e6 {[%clk 0:00:00]}  Rf8 {[%clk 0:00:00]} 23. exf7 {[%clk 0:00:00]}  Qc4+ {[%clk 0:00:00]} 24. Qxc4 {[%clk 0:00:00]}  Nxc4 {[%clk 0:00:00]} 25. Ne6+ {[%clk 0:00:00]} 1-0
+
+
+
+
+
+[Event "Kasparov Simul"]
+[Date "2025.10.21"]
+[Round "1"]
+[White "Kasparov, Garry"]
+[Black "Wannes Nys"]
+[Result "1-0"]
+[Board "20"]
+[TimeControl "5400+0"]
+[WhiteFideId "4100018"]
+[WhiteTitle "GM"]
+[WhiteElo "2812"]
+[WhiteTeam "RUS"]
+[WhiteClock "0:00:00"]
+[BlackClock "0:00:00"]
+[Variant "Standard"]
+
+1. d4 {[%clk 1:30:00]}  Nf6 {[%clk 0:00:00]} 2. c4 {[%clk 1:29:59]}  g6 {[%clk 0:00:00]} 3. Nc3 {[%clk 1:29:59]}  Bg7 {[%clk 0:00:00]} 4. e4 {[%clk 0:00:00]}  d6 {[%clk 0:00:00]} 5. Be2 {[%clk 0:00:00]}  O-O {[%clk 0:00:00]} 6. Be3 {[%clk 0:00:00]}  Nbd7 {[%clk 0:00:00]} 7. Nf3 {[%clk 0:00:00]}  c6 {[%clk 0:00:00]} 8. O-O {[%clk 0:00:00]}  Ne8 {[%clk 0:00:00]} 9. Qc2 {[%clk 0:00:00]}  e6 {[%clk 0:00:00]} 10. Rfd1 {[%clk 0:00:00]}  Nb6 {[%clk 0:00:00]} 11. c5 {[%clk 0:00:00]}  Nd7 {[%clk 0:00:00]} 12. cxd6 {[%clk 0:00:00]}  Nxd6 {[%clk 0:00:00]} 13. Bg5 {[%clk 0:00:00]}  f6 {[%clk 0:00:00]} 14. Bf4 {[%clk 0:00:00]}  Qe7 {[%clk 0:00:00]} 15. Rac1 {[%clk 0:00:00]}  b6 {[%clk 0:00:00]} 16. d5 {[%clk 0:00:00]}  e5 {[%clk 0:00:00]} 17. dxc6 {[%clk 0:00:00]}  Nb8 {[%clk 0:00:00]} 18. Nd5 {[%clk 0:00:00]}  Qf7 {[%clk 0:00:00]} 19. Bd2 {[%clk 0:00:00]}  Be6 {[%clk 0:00:00]} 20. Bb4 {[%clk 0:00:00]}  Bxd5 {[%clk 0:00:00]} 21. Rxd5 {[%clk 0:00:00]}  Rc8 {[%clk 0:00:00]} 22. Rxd6 {[%clk 0:00:00]}  Qe7 {[%clk 0:00:00]} 23. Qb3+ {[%clk 0:00:00]}  Kh8 {[%clk 0:00:00]} 24. Rcd1 {[%clk 0:00:00]}  Bf8 {[%clk 0:00:00]} 25. Rd8 {[%clk 0:00:00]}  Qxd8 {[%clk 0:00:00]} 26. Rxd8 {[%clk 0:00:00]}  Rxd8 {[%clk 0:00:00]} 27. c7 {[%clk 0:00:00]} 1-0
+
+
+
+
+
+[Event "Kasparov Simul"]
+[Date "2025.10.21"]
+[Round "1"]
+[White "Kasparov, Garry"]
+[Black "Babii, Oriiana"]
+[Result "1-0"]
+[Board "17"]
+[TimeControl "5400+0"]
+[WhiteFideId "4100018"]
+[BlackFideId "292826"]
+[WhiteTitle "GM"]
+[WhiteElo "2812"]
+[BlackElo "1649"]
+[WhiteTeam "RUS"]
+[BlackTeam "BEL"]
+[WhiteClock "0:00:00"]
+[BlackClock "0:00:00"]
+[Variant "Standard"]
+
+1. e4 {[%clk 1:30:00]}  c5 {[%clk 0:00:00]} 2. Nf3 {[%clk 1:29:58]}  d6 {[%clk 0:00:00]} 3. Bb5+ {[%clk 1:29:58]}  Bd7 {[%clk 0:00:00]} 4. c4 {[%clk 0:00:00]}  Nf6 {[%clk 0:00:00]} 5. Nc3 {[%clk 0:00:00]}  g6 {[%clk 0:00:00]} 6. d4 {[%clk 0:00:00]}  cxd4 {[%clk 0:00:00]} 7. Nxd4 {[%clk 0:00:00]}  Bg7 {[%clk 0:00:00]} 8. O-O {[%clk 0:00:00]}  O-O {[%clk 0:00:00]} 9. Bxd7 {[%clk 0:00:00]}  Nbxd7 {[%clk 0:00:00]} 10. b3 {[%clk 0:00:00]}  Rc8 {[%clk 0:00:00]} 11. Bb2 {[%clk 0:00:00]}  Qb6 {[%clk 0:00:00]} 12. Qd2 {[%clk 0:00:00]}  Nc5 {[%clk 0:00:00]} 13. Rfe1 {[%clk 0:00:00]}  Nfd7 {[%clk 0:00:00]} 14. Ndb5 {[%clk 0:00:00]}  Qa5 {[%clk 0:00:00]} 15. Rad1 {[%clk 0:00:00]}  a6 {[%clk 0:00:00]} 16. Nd4 {[%clk 0:00:00]}  Qc7 {[%clk 0:00:00]} 17. Nd5 {[%clk 0:00:00]}  Qd8 {[%clk 0:00:00]} 18. Nf3 {[%clk 0:00:00]}  e5 {[%clk 0:00:00]} 19. Nc3 {[%clk 0:00:00]}  Rc6 {[%clk 0:00:00]} 20. Re2 {[%clk 0:00:00]}  Nf6 {[%clk 0:00:00]} 21. Nxe5 {[%clk 0:00:00]}  Rb6 {[%clk 0:00:00]} 22. Nd3 {[%clk 0:00:00]}  Qc7 {[%clk 0:00:00]} 23. Nxc5 {[%clk 0:00:00]}  Qxc5 {[%clk 0:00:00]} 24. Na4 {[%clk 0:00:00]}  Qc6 {[%clk 0:00:00]} 25. Nxb6 {[%clk 0:00:00]} 1-0
