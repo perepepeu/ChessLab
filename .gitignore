@@ -8,6 +8,8 @@ runs/*/
 data/datasets/registry.json
 data/datasets/guided-examples.json
 data/uploads/*-????????.pgn
+data/players/**/*.pgn
+!data/players/kasparov-garry/*.pgn
 replays/*.pgn
 replays/registry.json
 tournaments/*.json

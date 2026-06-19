@@ -42,7 +42,7 @@ class TournamentManager:
             model_ids = [Path(value).name for value in config.get("model_ids", [])]
             if not model_ids:
                 raise ValueError("Escolha ao menos um checkpoint.")
-            rounds = max(1, min(10, int(config.get("rounds", 1))))
+            rounds = max(1, min(1000, int(config.get("rounds", 1))))
             max_plies = max(20, min(300, int(config.get("max_plies", 100))))
             tournament_id = datetime.now().strftime("%Y%m%d-%H%M%S") + "-" + uuid.uuid4().hex[:6]
             normalized = {"model_ids": model_ids, "rounds": rounds, "max_plies": max_plies,

@@ -23,6 +23,7 @@ Abra `http://127.0.0.1:5000`. O PGN de Kasparov fornecido já está disponível 
 ## O que está implementado
 
 - Importação de um ou vários arquivos `.pgn`, incluindo comentários de relógio.
+- Classificação automática por jogador dominante, com arquivos organizados em `data/players/<jogador>/`.
 - Regimes de imitação, autojogo por reforço e treino híbrido.
 - Aprendizado guiado: ensine lances diretamente no tabuleiro, com comentário e prioridade.
 - Fine-tuning de qualquer checkpoint salvo ou modelo `.npz` importado.

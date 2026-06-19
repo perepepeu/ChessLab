@@ -55,6 +55,21 @@ def list_datasets():
     return ok(datasets=datasets.list())
 
 
+@app.patch("/api/datasets/<dataset_id>")
+def rename_dataset(dataset_id):
+    if trainer.status()["running"]:
+        raise ValueError("Aguarde o treino atual terminar antes de alterar datasets.")
+    body = request.get_json(force=True) or {}
+    return ok(dataset=datasets.rename(dataset_id, body.get("name", "")), datasets=datasets.list())
+
+
+@app.delete("/api/datasets/<dataset_id>")
+def delete_dataset(dataset_id):
+    if trainer.status()["running"]:
+        raise ValueError("Aguarde o treino atual terminar antes de apagar datasets.")
+    return ok(deleted=datasets.delete(dataset_id), datasets=datasets.list())
+
+
 @app.post("/api/datasets/import")
 def import_dataset():
     files = request.files.getlist("files")
@@ -125,6 +140,13 @@ def import_model():
 @app.post("/api/models/<model_id>/load")
 def load_model(model_id):
     return ok(model=trainer.load_model(model_id))
+
+
+@app.delete("/api/models/<model_id>")
+def delete_model(model_id):
+    if trainer.status()["running"]:
+        raise ValueError("Pare o treinamento antes de apagar um modelo.")
+    return ok(result=trainer.delete_model(model_id), models=trainer.list_models())
 
 
 @app.get("/api/models/<model_id>/download")

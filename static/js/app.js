@@ -153,18 +153,39 @@ function drawMetricChart(canvas, metrics) {
 
 function renderDatasets(filter = '') {
   const needle = filter.toLowerCase();
-  const items = state.datasets.filter((d) => `${d.name} ${(d.players || []).join(' ')}`.toLowerCase().includes(needle));
+  const items = state.datasets.filter((d) => `${d.name} ${d.primary_player || ''} ${d.player_folder || ''} ${(d.players || []).join(' ')}`.toLowerCase().includes(needle));
   $('#datasetCount').textContent = `${state.datasets.length} conjunto${state.datasets.length === 1 ? '' : 's'}`;
-  $('#datasetGrid').innerHTML = items.map((dataset) => `<article class="dataset-card">
+  const groups = new Map();
+  items.forEach((dataset) => { const player = dataset.primary_player || 'Não classificado'; if (!groups.has(player)) groups.set(player, []); groups.get(player).push(dataset); });
+  $('#datasetGrid').innerHTML = [...groups.entries()].map(([player, datasets]) => `<div class="player-folder-header"><span>▰</span><div><small>PASTA DE JOGADOR</small><strong>${escapeHtml(player)}</strong></div><b>${datasets.length} arquivo${datasets.length === 1 ? '' : 's'}</b></div>${datasets.map((dataset) => `<article class="dataset-card">
     <div class="file-top"><span class="file-icon">PGN</span><span class="file-size">${formatBytes(dataset.size)}</span></div>
     <h3 title="${escapeHtml(dataset.name)}">${escapeHtml(dataset.name)}</h3>
-    <p title="${escapeHtml((dataset.players || []).join(', '))}">${escapeHtml((dataset.players || []).join(' · '))}</p>
+    <p class="player-path">⌑ ${escapeHtml(dataset.player_folder || 'Aguardando classificação')}</p>
+    <p title="${escapeHtml((dataset.players || []).join(', '))}">${dataset.primary_player_games || 0}/${dataset.games} partidas de ${escapeHtml(dataset.primary_player || 'jogador não identificado')}</p>
     <div class="dataset-metrics"><span><small>PARTIDAS</small><strong>${dataset.games}</strong></span><span><small>POSIÇÕES</small><strong>${formatNumber(dataset.positions)}</strong></span></div>
-  </article>`).join('') || '<div class="empty-library">Nenhum conjunto encontrado.</div>';
+    <div class="dataset-actions"><button data-rename-dataset="${dataset.id}">✎ Renomear</button><button class="destructive" data-delete-dataset="${dataset.id}">⌫ Apagar</button></div>
+  </article>`).join('')}`).join('') || '<div class="empty-library">Nenhum conjunto encontrado.</div>';
+  $$('[data-rename-dataset]').forEach((button) => button.addEventListener('click', () => renameDataset(button.dataset.renameDataset)));
+  $$('[data-delete-dataset]').forEach((button) => button.addEventListener('click', () => deleteDataset(button.dataset.deleteDataset)));
+}
+
+async function renameDataset(id) {
+  const dataset = state.datasets.find((item) => item.id === id);
+  const name = window.prompt('Novo nome do dataset:', dataset?.name || '');
+  if (!name || name.trim() === dataset?.name) return;
+  try { await api(`/api/datasets/${encodeURIComponent(id)}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: name.trim() }) }); toast('Dataset renomeado.'); await loadDashboard(true); }
+  catch (error) { toast(error.message, 'error'); }
+}
+
+async function deleteDataset(id) {
+  const dataset = state.datasets.find((item) => item.id === id);
+  if (!window.confirm(`Apagar o dataset “${dataset?.name || id}” e seu arquivo PGN?`)) return;
+  try { await api(`/api/datasets/${encodeURIComponent(id)}`, { method: 'DELETE' }); toast('Dataset apagado.'); await loadDashboard(true); }
+  catch (error) { toast(error.message, 'error'); }
 }
 
 function renderTrainingDatasets() {
-  $('#trainingDatasets').innerHTML = state.datasets.map((dataset) => `<label class="dataset-check"><input type="checkbox" name="dataset_ids" value="${dataset.id}" checked><span>${escapeHtml(dataset.name)}</span><small>${dataset.games} partidas</small></label>`).join('') || '<div class="empty-library">Importe um PGN para usar imitação.</div>';
+  $('#trainingDatasets').innerHTML = state.datasets.map((dataset) => `<label class="dataset-check"><input type="checkbox" name="dataset_ids" value="${dataset.id}" checked><span>${escapeHtml(dataset.name)}<small>${escapeHtml(dataset.primary_player || 'não classificado')}</small></span><small>${dataset.games} partidas</small></label>`).join('') || '<div class="empty-library">Importe um PGN para usar imitação.</div>';
 }
 
 function renderModelSelectors() {
@@ -186,7 +207,8 @@ async function uploadFiles(files) {
   const form = new FormData(); pgns.forEach((file) => form.append('files', file));
   try {
     const payload = await api('/api/datasets/import', { method: 'POST', body: form });
-    toast(`${payload.datasets.length} arquivo(s) importado(s) com sucesso.`);
+    const owners = [...new Set(payload.datasets.map((dataset) => dataset.primary_player))].join(', ');
+    toast(`${payload.datasets.length} arquivo(s) organizado(s) em: ${owners}.`);
     await loadDashboard(true);
   } catch (error) { toast(error.message, 'error'); }
   finally { zone.classList.remove('uploading'); $('#pgnInput').value = ''; }
@@ -517,14 +539,23 @@ function networkHover(event) {
 function renderModels() {
   $('#modelGrid').innerHTML = state.models.map((model) => {
     const config = model.config || {}, evaluation = model.evaluation || {};
-    return `<article class="model-card ${model.active ? 'active' : ''}"><div class="model-top"><span class="file-icon">NPZ</span>${model.active ? '<span class="model-badge">ATIVO</span>' : `<span class="file-size">${formatBytes(model.size)}</span>`}</div><h3>${escapeHtml(config.name || model.id)}</h3><p>${escapeHtml(model.id)} · ${model.parent_model_id ? `filho de ${escapeHtml(model.parent_model_id)}` : ago(model.created_at)}</p><div class="model-score"><span><small>REGIME</small><strong>${escapeHtml(config.mode || '—')}</strong></span><span><small>ACURÁCIA TESTE</small><strong>${((evaluation.test_policy_accuracy || 0) * 100).toFixed(1)}%</strong></span><span><small>PARÂMETROS</small><strong>${formatNumber(evaluation.parameters)}</strong></span></div><div class="model-actions"><button data-load-model="${model.id}" ${model.active ? 'disabled' : ''}>${model.active ? 'Em uso' : 'Carregar'}</button><button data-finetune-model="${model.id}">Ajustar</button><a href="/api/models/${model.id}/download">Exportar</a></div></article>`;
+    return `<article class="model-card ${model.active ? 'active' : ''}"><div class="model-top"><span class="file-icon">NPZ</span>${model.active ? '<span class="model-badge">ATIVO</span>' : `<span class="file-size">${formatBytes(model.size)}</span>`}</div><h3>${escapeHtml(config.name || model.id)}</h3><p>${escapeHtml(model.id)} · ${model.parent_model_id ? `filho de ${escapeHtml(model.parent_model_id)}` : ago(model.created_at)}</p><div class="model-score"><span><small>REGIME</small><strong>${escapeHtml(config.mode || '—')}</strong></span><span><small>ACURÁCIA TESTE</small><strong>${((evaluation.test_policy_accuracy || 0) * 100).toFixed(1)}%</strong></span><span><small>PARÂMETROS</small><strong>${formatNumber(evaluation.parameters)}</strong></span></div><div class="model-actions"><button data-load-model="${model.id}" ${model.active ? 'disabled' : ''}>${model.active ? 'Em uso' : 'Carregar'}</button><button data-finetune-model="${model.id}">Ajustar</button><a href="/api/models/${model.id}/download">Exportar</a><button class="destructive" data-delete-model="${model.id}">Apagar</button></div></article>`;
   }).join('') || '<div class="empty-library">Nenhum checkpoint ainda. Seu primeiro modelo aparecerá aqui.</div>';
   $$('[data-load-model]').forEach((button) => button.addEventListener('click', () => loadModel(button.dataset.loadModel)));
   $$('[data-finetune-model]').forEach((button) => button.addEventListener('click', () => { changeView('training'); $('#baseModelSelect').value = button.dataset.finetuneModel; $('#trainingForm').elements.name.value = `${state.models.find((m) => m.id === button.dataset.finetuneModel)?.config?.name || 'Modelo'} FT`; toast('Modelo base selecionado para ajuste fino.'); }));
+  $$('[data-delete-model]').forEach((button) => button.addEventListener('click', () => deleteModel(button.dataset.deleteModel)));
 }
 
 async function loadModel(id) {
   try { await api(`/api/models/${encodeURIComponent(id)}/load`, { method: 'POST' }); toast('Checkpoint carregado na arena.'); await loadDashboard(true); }
+  catch (error) { toast(error.message, 'error'); }
+}
+
+async function deleteModel(id) {
+  const model = state.models.find((item) => item.id === id);
+  const label = model?.config?.name || id;
+  if (!window.confirm(`Apagar permanentemente o modelo “${label}”? Os replays serão preservados.`)) return;
+  try { await api(`/api/models/${encodeURIComponent(id)}`, { method: 'DELETE' }); toast('Modelo apagado.'); await loadDashboard(true); }
   catch (error) { toast(error.message, 'error'); }
 }
 

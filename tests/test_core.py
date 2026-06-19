@@ -14,6 +14,7 @@ from chesslab.encoding import INPUT_SIZE, OUTPUT_SIZE, encode_board, move_to_id
 from chesslab.model import PolicyNetwork
 from chesslab.replays import ReplayStore
 from chesslab.competition import TournamentManager
+from chesslab.training import TrainingManager
 
 
 PGN = b'''[Event "Tiny"]
@@ -24,12 +25,26 @@ PGN = b'''[Event "Tiny"]
 1. e4 e5 2. Nf3 Nc6 3. Bb5 a6 1-0
 '''
 
+PGN_PLAYER = b'''[Event "One"]
+[White "Magnus Carlsen"]
+[Black "Player A"]
+[Result "1-0"]
+
+1. e4 e5 1-0
+
+[Event "Two"]
+[White "Player B"]
+[Black "Magnus Carlsen"]
+[Result "0-1"]
+
+1. d4 d5 0-1
+'''
+
 
 class Upload:
-    filename = "tiny.pgn"
-
-    def __init__(self):
-        self.stream = BytesIO(PGN)
+    def __init__(self, raw=PGN, filename="tiny.pgn"):
+        self.filename = filename
+        self.stream = BytesIO(raw)
 
     def read(self):
         return self.stream.read()
@@ -50,8 +65,26 @@ class DatasetTests(unittest.TestCase):
             item = store.register_upload(Upload())
             self.assertEqual(item["games"], 1)
             self.assertEqual(item["positions"], 6)
+            self.assertEqual(item["primary_player"], "Coleções mistas")
+            self.assertEqual(Path(item["path"]).parent.name, "colecoes-mistas")
+            self.assertEqual(Path(item["path"]).name, f"colecoes-mistas-1-partida-{item['sha256'][:8]}.pgn")
             packed, _ = store.load_positions([item["id"]])
             self.assertEqual(sum(len(v[1]) for v in packed.values()), 6)
+            renamed = store.rename(item["id"], "Partidas de teste")
+            self.assertEqual(renamed["name"], "Partidas de teste")
+            deleted = store.delete(item["id"])
+            self.assertEqual(deleted["id"], item["id"])
+            self.assertEqual(store.list(), [])
+
+    def test_dataset_is_organized_by_dominant_player(self):
+        with tempfile.TemporaryDirectory() as directory:
+            store = DatasetStore(Path(directory))
+            item = store.register_upload(Upload(PGN_PLAYER, "magnus-games.pgn"))
+            self.assertEqual(item["primary_player"], "Magnus Carlsen")
+            self.assertEqual(item["primary_player_games"], 2)
+            self.assertEqual(Path(item["path"]).parent.name, "magnus-carlsen")
+            self.assertEqual(Path(item["path"]).name, f"magnus-carlsen-2-partidas-{item['sha256'][:8]}.pgn")
+            self.assertTrue(Path(item["path"]).exists())
 
     def test_guided_examples_are_weighted_training_positions(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -64,6 +97,10 @@ class DatasetTests(unittest.TestCase):
 
 
 class ModelTests(unittest.TestCase):
+    def test_starting_from_zero_does_not_invent_none_checkpoint(self):
+        config = TrainingManager._normalize_config({"base_model_id": None})
+        self.assertIsNone(config["base_model_id"])
+
     def test_train_save_load_and_legal_move(self):
         model = PolicyNetwork([16], seed=7, name="Teste")
         board = chess.Board()

@@ -72,11 +72,13 @@ class TrainingManager:
         layers = config.get("hidden_layers", [96, 64])
         if isinstance(layers, str):
             layers = [int(v.strip()) for v in layers.split(",") if v.strip()]
+        raw_base_model = config.get("base_model_id")
+        base_model_id = Path(str(raw_base_model)).name if raw_base_model else None
         return {
             "name": str(config.get("name", "Aurora")).strip()[:40] or "Aurora",
             "mode": config.get("mode", "hybrid") if config.get("mode") in {"imitation", "selfplay", "hybrid", "guided"} else "hybrid",
             "hidden_layers": [max(8, min(256, int(v))) for v in layers[:3]] or [64],
-            "epochs": max(1, min(50, int(config.get("epochs", 4)))),
+            "epochs": max(1, min(1000, int(config.get("epochs", 4)))),
             "batch_size": max(4, min(256, int(config.get("batch_size", 32)))),
             "learning_rate": max(0.00001, min(0.05, float(config.get("learning_rate", 0.001)))),
             "selfplay_episodes": max(1, min(100, int(config.get("selfplay_episodes", 8)))),
@@ -85,7 +87,7 @@ class TrainingManager:
             "seed": int(config.get("seed", 42)),
             "dataset_ids": list(config["dataset_ids"]) if "dataset_ids" in config else None,
             "include_guided": bool(config.get("include_guided", True)),
-            "base_model_id": Path(str(config.get("base_model_id", ""))).name or None,
+            "base_model_id": base_model_id,
         }
 
     def stop(self) -> None:
@@ -305,3 +307,17 @@ class TrainingManager:
         self.model, metadata = PolicyNetwork.load(path)
         self.active_model_id = model_id
         return metadata
+
+    def delete_model(self, model_id: str) -> dict:
+        safe_id = Path(model_id).name
+        model_path = self.models_dir / f"{safe_id}.npz"
+        metadata_path = self.models_dir / f"{safe_id}.json"
+        if not model_path.exists() and not metadata_path.exists():
+            raise ValueError("Checkpoint não encontrado.")
+        model_path.unlink(missing_ok=True)
+        metadata_path.unlink(missing_ok=True)
+        if self.active_model_id == safe_id:
+            self.active_model_id = None
+            self.model = PolicyNetwork()
+            self._restore_latest()
+        return {"deleted": safe_id, "active_model_id": self.active_model_id, "active_model": self.model.name}

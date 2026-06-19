@@ -2,7 +2,10 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
 import shutil
+import unicodedata
+from collections import Counter
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -16,15 +19,18 @@ class DatasetStore:
     def __init__(self, root: Path):
         self.root = root
         self.upload_dir = root / "uploads"
+        self.players_dir = root / "players"
         self.registry_path = root / "datasets" / "registry.json"
         self.guided_path = root / "datasets" / "guided-examples.json"
         self.upload_dir.mkdir(parents=True, exist_ok=True)
+        self.players_dir.mkdir(parents=True, exist_ok=True)
         self.registry_path.parent.mkdir(parents=True, exist_ok=True)
         if not self.registry_path.exists():
             self.registry_path.write_text("[]", encoding="utf-8")
         if not self.guided_path.exists():
             self.guided_path.write_text("[]", encoding="utf-8")
         self.bootstrap()
+        self.organize_existing()
 
     def _registry(self) -> list[dict]:
         try:
@@ -61,12 +67,18 @@ class DatasetStore:
         registry = self._registry()
         existing = next((item for item in registry if item["sha256"] == digest), None)
         if existing:
+            if path.resolve() != Path(existing["path"]).resolve() and path.is_relative_to(self.upload_dir):
+                path.unlink(missing_ok=True)
             return existing
-        games, positions, players, results = self.inspect(path)
+        games, positions, players, results, player_counts = self.inspect(path)
+        primary_player, appearances, confidence = self.identify_primary_player(player_counts, games)
+        organized_path, folder_name = self.organize_file(path, primary_player, games, digest)
         item = {
-            "id": digest[:12], "name": path.stem, "filename": path.name,
-            "path": str(path.resolve()), "sha256": digest, "games": games,
+            "id": digest[:12], "name": path.stem, "filename": organized_path.name,
+            "path": str(organized_path.resolve()), "sha256": digest, "games": games,
             "positions": positions, "players": players[:8], "results": results,
+            "primary_player": primary_player, "primary_player_games": appearances,
+            "player_confidence": round(confidence, 4), "player_folder": folder_name,
             "size": len(raw), "imported_at": datetime.now(timezone.utc).isoformat(),
         }
         registry.insert(0, item)
@@ -74,9 +86,10 @@ class DatasetStore:
         return item
 
     @staticmethod
-    def inspect(path: Path) -> tuple[int, int, list[str], dict[str, int]]:
+    def inspect(path: Path) -> tuple[int, int, list[str], dict[str, int], Counter]:
         games = positions = 0
         players: set[str] = set()
+        player_counts: Counter = Counter()
         results = {"1-0": 0, "0-1": 0, "1/2-1/2": 0, "*": 0}
         with path.open("r", encoding="utf-8-sig", errors="replace") as handle:
             while True:
@@ -85,15 +98,112 @@ class DatasetStore:
                     break
                 games += 1
                 positions += sum(1 for _ in game.mainline_moves())
-                players.update(filter(None, [game.headers.get("White"), game.headers.get("Black")]))
+                game_players = [name.strip() for name in [game.headers.get("White", ""), game.headers.get("Black", "")] if name.strip() and name.strip() != "?"]
+                players.update(game_players)
+                player_counts.update(game_players)
                 result = game.headers.get("Result", "*")
                 results[result] = results.get(result, 0) + 1
         if not games:
             raise ValueError("Nenhuma partida PGN válida foi encontrada.")
-        return games, positions, sorted(players), results
+        return games, positions, sorted(players), results, player_counts
+
+    @staticmethod
+    def identify_primary_player(player_counts: Counter, games: int) -> tuple[str, int, float]:
+        ranked = player_counts.most_common()
+        if not ranked:
+            return "Coleções mistas", 0, 0.0
+        name, appearances = ranked[0]
+        second = ranked[1][1] if len(ranked) > 1 else 0
+        confidence = appearances / max(1, games)
+        if appearances > second and confidence >= 0.5:
+            return name, appearances, confidence
+        return "Coleções mistas", appearances, confidence
+
+    @staticmethod
+    def player_slug(name: str) -> str:
+        ascii_name = unicodedata.normalize("NFKD", name).encode("ascii", "ignore").decode("ascii")
+        slug = re.sub(r"[^A-Za-z0-9]+", "-", ascii_name).strip("-").lower()
+        return slug[:70] or "colecoes-mistas"
+
+    def organized_filename(self, primary_player: str, games: int, digest: str) -> str:
+        suffix = "partida" if games == 1 else "partidas"
+        return f"{self.player_slug(primary_player)}-{games}-{suffix}-{digest[:8]}.pgn"
+
+    def organize_file(self, path: Path, primary_player: str, games: int, digest: str) -> tuple[Path, str]:
+        folder_name = self.player_slug(primary_player)
+        folder = self.players_dir / folder_name
+        folder.mkdir(parents=True, exist_ok=True)
+        destination = folder / self.organized_filename(primary_player, games, digest)
+        if path.resolve() != destination.resolve():
+            if destination.exists():
+                if hashlib.sha256(destination.read_bytes()).digest() == hashlib.sha256(path.read_bytes()).digest():
+                    path.unlink(missing_ok=True)
+                else:
+                    destination = folder / f"{path.stem}-{hashlib.sha256(path.read_bytes()).hexdigest()[:8]}{path.suffix}"
+                    shutil.move(str(path), str(destination))
+            else:
+                shutil.move(str(path), str(destination))
+        return destination, f"Jogadores/{folder_name}"
+
+    def organize_existing(self) -> None:
+        registry = self._registry()
+        changed = False
+        for item in registry:
+            path = Path(item.get("path", ""))
+            if not path.exists():
+                continue
+            if not item.get("primary_player"):
+                games, _, players, _, counts = self.inspect(path)
+                primary, appearances, confidence = self.identify_primary_player(counts, games)
+                item.update(primary_player=primary, primary_player_games=appearances,
+                            player_confidence=round(confidence, 4), players=players[:8])
+                changed = True
+            managed_path = path.is_relative_to(self.upload_dir.resolve()) or path.is_relative_to(self.players_dir.resolve())
+            expected_name = self.organized_filename(item["primary_player"], int(item["games"]), item["sha256"])
+            expected_folder = (self.players_dir / self.player_slug(item["primary_player"])).resolve()
+            if managed_path and (path.parent.resolve() != expected_folder or path.name != expected_name):
+                organized_path, folder_name = self.organize_file(path, item["primary_player"], int(item["games"]), item["sha256"])
+                item.update(path=str(organized_path.resolve()), filename=organized_path.name, player_folder=folder_name)
+                changed = True
+            elif not item.get("player_folder"):
+                item["player_folder"] = f"Jogadores/{self.player_slug(item['primary_player'])}"
+                changed = True
+        if changed:
+            self._write_registry(registry)
 
     def list(self) -> list[dict]:
         return self._registry()
+
+    def rename(self, dataset_id: str, name: str) -> dict:
+        clean_name = " ".join(str(name).strip().split())[:80]
+        if not clean_name:
+            raise ValueError("Informe um nome para o dataset.")
+        registry = self._registry()
+        item = next((entry for entry in registry if entry["id"] == dataset_id), None)
+        if not item:
+            raise ValueError("Dataset não encontrado.")
+        item["name"] = clean_name
+        self._write_registry(registry)
+        return item
+
+    def delete(self, dataset_id: str) -> dict:
+        registry = self._registry()
+        item = next((entry for entry in registry if entry["id"] == dataset_id), None)
+        if not item:
+            raise ValueError("Dataset não encontrado.")
+        path = Path(item["path"]).resolve()
+        managed = path.is_relative_to(self.upload_dir.resolve()) or path.is_relative_to(self.players_dir.resolve())
+        if not managed:
+            raise ValueError("O arquivo está fora da biblioteca gerenciada e não pode ser apagado.")
+        registry = [entry for entry in registry if entry["id"] != dataset_id]
+        self._write_registry(registry)
+        path.unlink(missing_ok=True)
+        if path.parent != self.players_dir and path.parent.is_relative_to(self.players_dir):
+            try:
+                path.parent.rmdir()
+            except OSError:
+                pass
+        return item
 
     def list_guided(self) -> list[dict]:
         try:
