@@ -7,6 +7,7 @@ from pathlib import Path
 import chess
 from flask import Flask, jsonify, render_template, request, send_file
 from dotenv import load_dotenv
+from werkzeug.exceptions import HTTPException, RequestEntityTooLarge
 
 from chesslab.data import DatasetStore
 from chesslab.competition import TournamentManager
@@ -51,10 +52,19 @@ def ok(**payload):
     return jsonify({"ok": True, **payload})
 
 
-@app.errorhandler(Exception)
-def handle_error(error):
-    code = getattr(error, "code", 400)
-    return jsonify({"ok": False, "error": str(error)}), code if isinstance(code, int) else 400
+@app.errorhandler(ValueError)
+def handle_validation_error(error):
+    return jsonify({"ok": False, "error": str(error)}), 400
+
+
+@app.errorhandler(RequestEntityTooLarge)
+def handle_large_upload(error):
+    return jsonify({"ok": False, "error": "O arquivo excede o limite de upload configurado."}), 413
+
+
+@app.errorhandler(HTTPException)
+def handle_http_error(error):
+    return jsonify({"ok": False, "error": error.description}), error.code
 
 
 @app.get("/")
