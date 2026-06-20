@@ -1,10 +1,15 @@
 # ChessLab AI
 
+[![Python](https://img.shields.io/badge/python-3.10%2B-blue)](https://www.python.org/)
+[![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
+
+![ChessLab AI gameplay against a trained model](docs/assets/chesslab-gameplay.gif)
+
 [English](#english) · [Português (Brasil)](#português-brasil)
 
 ## English
 
-ChessLab AI is a local, inspectable chess-learning laboratory built with Python and a responsive HTML interface. It imports PGN collections, learns through imitation and self-play, supports guided corrections and checkpoint fine-tuning, and exposes real network weights and activations.
+ChessLab AI is a local, inspectable chess-learning laboratory built with Python 3.10+ and a responsive HTML interface. It imports PGN collections, learns through imitation and self-play, supports guided corrections and checkpoint fine-tuning, and exposes real network weights and activations.
 
 ### Quick start
 
@@ -30,7 +35,7 @@ python -m pip install -r requirements-dev.txt
 
 ### Configuration
 
-Copy `.env.example` to `.env` and change values without editing application code:
+The tracked [`.env.example`](.env.example) file is included in the repository. Copy it to `.env` and change values without editing application code:
 
 ```env
 CHESSLAB_HOST=127.0.0.1
@@ -60,6 +65,27 @@ CHESSLAB_SESSION_DB=data/chesslab.sqlite3
 
 The input contains 773 values: 12 piece planes, side to move, and four castling rights. The output contains 4,096 origin/destination logits. Illegal moves are masked before selection.
 
+```text
+PGN games ──┐
+Mentor moves ├──► Board encoder ──► 12 × 8 × 8 + 5 metadata
+Self-play ───┘                              │
+                                           ▼
+                                     773 inputs
+                                           │
+                                           ▼
+                              1–3 configurable dense layers
+                                 (8–256 neurons + ReLU)
+                                           │
+                                           ▼
+                              4,096 origin→destination logits
+                                           │
+                                           ▼
+                                  Legal-move mask
+                                           │
+                                           ▼
+                                  Policy / Search ──► Move
+```
+
 Imitation training minimizes cross-entropy against PGN moves. Self-play uses a bounded REINFORCE update with terminal results and a small material signal. Hybrid training performs imitation before controlled self-play. Guided examples let a human assign preferred legal moves and priorities.
 
 ChessLab is an educational and experimental system, not a replacement for Stockfish or a full AlphaZero implementation. Promotion moves currently share their origin/destination logit and prefer queen promotion during inference. Championship Elo is local to one controlled league and is not a FIDE rating.
@@ -85,7 +111,7 @@ The suite covers model encoding, datasets, PGN validation, session persistence, 
 
 ## Português (Brasil)
 
-O ChessLab AI é um laboratório local e inspecionável de aprendizado de xadrez, construído em Python com uma interface HTML responsiva. Ele importa coleções PGN, aprende por imitação e autojogo, aceita correções guiadas e fine-tuning de checkpoints, além de expor pesos e ativações reais da rede.
+O ChessLab AI é um laboratório local e inspecionável de aprendizado de xadrez, construído em Python 3.10+ com uma interface HTML responsiva. Ele importa coleções PGN, aprende por imitação e autojogo, aceita correções guiadas e fine-tuning de checkpoints, além de expor pesos e ativações reais da rede.
 
 ### Início rápido
 
@@ -111,7 +137,7 @@ python -m pip install -r requirements-dev.txt
 
 ### Configuração
 
-Copie `.env.example` para `.env` e altere as configurações sem editar o código:
+O arquivo [`.env.example`](.env.example) está versionado e incluído no repositório. Copie-o para `.env` e altere as configurações sem editar o código:
 
 ```env
 CHESSLAB_HOST=127.0.0.1
@@ -140,6 +166,27 @@ CHESSLAB_SESSION_DB=data/chesslab.sqlite3
 ### Arquitetura de aprendizado
 
 A entrada possui 773 valores: 12 planos de peças, lado a jogar e quatro direitos de roque. A saída possui 4.096 logits de origem/destino. Movimentos ilegais são mascarados antes da escolha.
+
+```text
+Partidas PGN ──┐
+Lances Mentor ─┼──► Codificador ──► 12 × 8 × 8 + 5 metadados
+Autojogo ──────┘                           │
+                                          ▼
+                                     773 entradas
+                                          │
+                                          ▼
+                              1–3 camadas densas configuráveis
+                                  (8–256 neurônios + ReLU)
+                                          │
+                                          ▼
+                              4.096 logits de origem→destino
+                                          │
+                                          ▼
+                                 Máscara de lances legais
+                                          │
+                                          ▼
+                                 Política / Busca ──► Lance
+```
 
 O treino por imitação minimiza entropia cruzada contra os lances dos PGNs. O autojogo usa uma atualização REINFORCE limitada com resultado terminal e um pequeno sinal material. O modo híbrido realiza imitação antes do autojogo controlado. Exemplos guiados permitem que uma pessoa indique movimentos legais preferidos e suas prioridades.
 
