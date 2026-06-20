@@ -15,6 +15,7 @@ from chesslab.model import PolicyNetwork
 from chesslab.replays import ReplayStore
 from chesslab.competition import TournamentManager
 from chesslab.training import TrainingManager
+from chesslab.sessions import GameSessionStore
 
 
 PGN = b'''[Event "Tiny"]
@@ -140,6 +141,21 @@ class ReplayTests(unittest.TestCase):
         TournamentManager._score(table, "a", "b", "1-0")
         self.assertEqual(table["a"]["points"], 1.0)
         self.assertGreater(table["a"]["elo"], table["b"]["elo"])
+
+
+class SessionTests(unittest.TestCase):
+    def test_sessions_expire_and_evict_least_recently_used(self):
+        now = [0.0]
+        store = GameSessionStore(max_sessions=2, ttl_seconds=10, clock=lambda: now[0])
+        store.put("a", chess.Board(), "policy")
+        store.put("b", chess.Board(), "policy")
+        self.assertIsNotNone(store.get("a"))
+        store.put("c", chess.Board(), "policy")
+        self.assertIsNone(store.get("b"))
+        self.assertIsNotNone(store.get("a"))
+        now[0] = 11.0
+        self.assertIsNone(store.get("a"))
+        self.assertEqual(len(store), 0)
 
 
 if __name__ == "__main__":

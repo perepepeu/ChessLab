@@ -10,6 +10,7 @@ from chesslab.data import DatasetStore
 from chesslab.competition import TournamentManager
 from chesslab.replays import ReplayStore
 from chesslab.search import choose_with_search
+from chesslab.sessions import GameSessionStore
 from chesslab.training import TrainingManager
 
 
@@ -20,7 +21,7 @@ datasets = DatasetStore(ROOT / "data")
 replays = ReplayStore(ROOT)
 trainer = TrainingManager(ROOT, datasets, replays)
 tournament = TournamentManager(ROOT, replays)
-games: dict[str, dict] = {}
+games = GameSessionStore(max_sessions=100, ttl_seconds=12 * 60 * 60)
 
 
 def ok(**payload):
@@ -205,13 +206,13 @@ def new_game():
     strength = body.get("strength", "tactical") if body.get("strength") in {"policy", "tactical", "search2"} else "tactical"
     session_id = uuid.uuid4().hex
     board = chess.Board()
-    games[session_id] = {"board": board, "strength": strength}
     ai_move = None
     if color == "black":
         move = choose_with_search(trainer.model, board, strength)
         if move:
             board.push(move)
             ai_move = move.uci()
+    games.put(session_id, board, strength)
     return ok(game=board_payload(board, session_id, ai_move))
 
 
