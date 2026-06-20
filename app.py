@@ -1,10 +1,12 @@
 from __future__ import annotations
 
+import os
 import uuid
 from pathlib import Path
 
 import chess
 from flask import Flask, jsonify, render_template, request, send_file
+from dotenv import load_dotenv
 
 from chesslab.data import DatasetStore
 from chesslab.competition import TournamentManager
@@ -15,13 +17,34 @@ from chesslab.training import TrainingManager
 
 
 ROOT = Path(__file__).resolve().parent
+load_dotenv(ROOT / ".env")
+
+
+def env_int(name: str, default: int) -> int:
+    try:
+        return int(os.getenv(name, str(default)))
+    except ValueError:
+        return default
+
+
+def env_float(name: str, default: float) -> float:
+    try:
+        return float(os.getenv(name, str(default)))
+    except ValueError:
+        return default
+
+
+APP_HOST = os.getenv("CHESSLAB_HOST", "127.0.0.1")
+APP_PORT = env_int("CHESSLAB_PORT", 5000)
+APP_DEBUG = os.getenv("CHESSLAB_DEBUG", "false").lower() in {"1", "true", "yes", "on"}
 app = Flask(__name__)
-app.config["MAX_CONTENT_LENGTH"] = 64 * 1024 * 1024
+app.config["MAX_CONTENT_LENGTH"] = env_int("CHESSLAB_MAX_CONTENT_MB", 64) * 1024 * 1024
 datasets = DatasetStore(ROOT / "data")
 replays = ReplayStore(ROOT)
 trainer = TrainingManager(ROOT, datasets, replays)
 tournament = TournamentManager(ROOT, replays)
-games = GameSessionStore(max_sessions=100, ttl_seconds=12 * 60 * 60)
+games = GameSessionStore(max_sessions=env_int("CHESSLAB_MAX_SESSIONS", 100),
+                         ttl_seconds=env_float("CHESSLAB_SESSION_TTL_HOURS", 12) * 60 * 60)
 
 
 def ok(**payload):
@@ -241,4 +264,4 @@ def play_move():
 
 
 if __name__ == "__main__":
-    app.run(host="127.0.0.1", port=5000, debug=False, threaded=True)
+    app.run(host=APP_HOST, port=APP_PORT, debug=APP_DEBUG, threaded=True)
