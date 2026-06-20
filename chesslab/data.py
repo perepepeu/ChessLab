@@ -7,6 +7,7 @@ import shutil
 import unicodedata
 from collections import Counter
 from datetime import datetime, timezone
+from io import StringIO
 from pathlib import Path
 
 import chess.pgn
@@ -51,11 +52,29 @@ class DatasetStore:
         raw = file_storage.read()
         if not raw:
             raise ValueError("O arquivo PGN está vazio.")
+        self.validate_pgn_content(raw)
         digest = hashlib.sha256(raw).hexdigest()
         safe_name = Path(file_storage.filename or "partidas.pgn").stem[:60]
         destination = self.upload_dir / f"{safe_name}-{digest[:8]}.pgn"
         destination.write_bytes(raw)
         return self.register_path(destination, copy=False)
+
+    @staticmethod
+    def validate_pgn_content(raw: bytes) -> None:
+        if b"\x00" in raw:
+            raise ValueError("O arquivo contém dados binários e não é um PGN de texto.")
+        try:
+            text = raw.decode("utf-8-sig")
+        except UnicodeDecodeError:
+            try:
+                text = raw.decode("cp1252")
+            except UnicodeDecodeError as exc:
+                raise ValueError("Não foi possível decodificar o arquivo PGN.") from exc
+        if not re.search(r'^\s*\[(Event|Site|Date|White|Black|Result)\s+"[^"]*"\]', text, re.MULTILINE):
+            raise ValueError("Conteúdo inválido: nenhum cabeçalho PGN foi encontrado.")
+        headers = chess.pgn.read_headers(StringIO(text))
+        if headers is None or not headers.get("White") or not headers.get("Black"):
+            raise ValueError("Conteúdo inválido: o primeiro jogo precisa informar White e Black.")
 
     def register_path(self, path: Path, copy: bool = False) -> dict:
         if copy:

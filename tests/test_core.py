@@ -60,6 +60,13 @@ class EncodingTests(unittest.TestCase):
 
 
 class DatasetTests(unittest.TestCase):
+    def test_rejects_file_with_pgn_extension_but_invalid_content(self):
+        with tempfile.TemporaryDirectory() as directory:
+            store = DatasetStore(Path(directory))
+            with self.assertRaisesRegex(ValueError, "cabeçalho PGN"):
+                store.register_upload(Upload(b"isto nao e xadrez", "falso.pgn"))
+            self.assertEqual(list((Path(directory) / "uploads").glob("*.pgn")), [])
+
     def test_import_and_position_extraction(self):
         with tempfile.TemporaryDirectory() as directory:
             store = DatasetStore(Path(directory))
