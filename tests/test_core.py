@@ -164,6 +164,21 @@ class SessionTests(unittest.TestCase):
         self.assertIsNone(store.get("a"))
         self.assertEqual(len(store), 0)
 
+    def test_session_survives_store_restart(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "sessions.sqlite3"
+            board = chess.Board()
+            board.push_uci("e2e4")
+            first = GameSessionStore(path, max_sessions=10, ttl_seconds=100)
+            first.put("persistent", board, "tactical")
+            first.close()
+            second = GameSessionStore(path, max_sessions=10, ttl_seconds=100)
+            restored = second.get("persistent")
+            self.assertIsNotNone(restored)
+            self.assertEqual(restored["board"].fen(), board.fen())
+            self.assertEqual(restored["strength"], "tactical")
+            second.close()
+
 
 if __name__ == "__main__":
     unittest.main()

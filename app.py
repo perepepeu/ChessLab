@@ -45,7 +45,8 @@ replays = ReplayStore(ROOT)
 trainer = TrainingManager(ROOT, datasets, replays)
 tournament = TournamentManager(ROOT, replays)
 games = GameSessionStore(max_sessions=env_int("CHESSLAB_MAX_SESSIONS", 100),
-                         ttl_seconds=env_float("CHESSLAB_SESSION_TTL_HOURS", 12) * 60 * 60)
+                         ttl_seconds=env_float("CHESSLAB_SESSION_TTL_HOURS", 12) * 60 * 60,
+                         database_path=ROOT / os.getenv("CHESSLAB_SESSION_DB", "data/chesslab.sqlite3"))
 
 
 def ok(**payload):
@@ -270,6 +271,7 @@ def play_move():
         if ai_move:
             board.push(ai_move)
             ai_uci = ai_move.uci()
+    games.put(session_id, board, session["strength"])
     return ok(game=board_payload(board, session_id, ai_uci))
 
 
