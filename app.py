@@ -14,6 +14,7 @@ from chesslab.competition import TournamentManager
 from chesslab.replays import ReplayStore
 from chesslab.search import choose_with_search
 from chesslab.sessions import GameSessionStore
+from chesslab.operations import OperationGate
 from chesslab.training import TrainingManager
 
 
@@ -42,8 +43,9 @@ app = Flask(__name__)
 app.config["MAX_CONTENT_LENGTH"] = env_int("CHESSLAB_MAX_CONTENT_MB", 64) * 1024 * 1024
 datasets = DatasetStore(ROOT / "data")
 replays = ReplayStore(ROOT)
-trainer = TrainingManager(ROOT, datasets, replays)
-tournament = TournamentManager(ROOT, replays)
+operation_gate = OperationGate()
+trainer = TrainingManager(ROOT, datasets, replays, operation_gate)
+tournament = TournamentManager(ROOT, replays, operation_gate)
 games = GameSessionStore(max_sessions=env_int("CHESSLAB_MAX_SESSIONS", 100),
                          ttl_seconds=env_float("CHESSLAB_SESSION_TTL_HOURS", 12) * 60 * 60,
                          database_path=ROOT / os.getenv("CHESSLAB_SESSION_DB", "data/chesslab.sqlite3"))

@@ -13,15 +13,17 @@ import chess.pgn
 from .model import PolicyNetwork
 from .replays import ReplayStore
 from .search import choose_with_search
+from .operations import OperationGate
 
 
 class TournamentManager:
-    def __init__(self, root: Path, replays: ReplayStore):
+    def __init__(self, root: Path, replays: ReplayStore, operation_gate: OperationGate | None = None):
         self.root = root
         self.models_dir = root / "models"
         self.tournaments_dir = root / "tournaments"
         self.tournaments_dir.mkdir(exist_ok=True)
         self.replays = replays
+        self.operation_gate = operation_gate or OperationGate()
         self.lock = threading.RLock()
         self.stop_event = threading.Event()
         self.thread: threading.Thread | None = None
@@ -39,6 +41,15 @@ class TournamentManager:
         with self.lock:
             if self.thread and self.thread.is_alive():
                 raise ValueError("Já existe um campeonato em andamento.")
+            self.operation_gate.acquire("tournament")
+            try:
+                return self._start_locked(config)
+            except Exception:
+                self.operation_gate.release("tournament")
+                raise
+
+    def _start_locked(self, config: dict) -> dict:
+        with self.lock:
             model_ids = [Path(value).name for value in config.get("model_ids", [])]
             if not model_ids:
                 raise ValueError("Escolha ao menos um checkpoint.")
@@ -97,6 +108,8 @@ class TournamentManager:
         except Exception as exc:
             with self.lock:
                 self.state.update(running=False, stage="Falha", error=str(exc))
+        finally:
+            self.operation_gate.release("tournament")
 
     def _load_players(self, model_ids: list[str]) -> list[dict]:
         players = []

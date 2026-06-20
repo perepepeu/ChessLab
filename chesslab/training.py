@@ -17,10 +17,12 @@ from .data import DatasetStore
 from .encoding import encode_board, material_score, move_to_id
 from .model import PolicyNetwork
 from .replays import ReplayStore
+from .operations import OperationGate
 
 
 class TrainingManager:
-    def __init__(self, root: Path, datasets: DatasetStore, replays: ReplayStore | None = None):
+    def __init__(self, root: Path, datasets: DatasetStore, replays: ReplayStore | None = None,
+                 operation_gate: OperationGate | None = None):
         self.root = root
         self.datasets = datasets
         self.models_dir = root / "models"
@@ -28,6 +30,7 @@ class TrainingManager:
         self.models_dir.mkdir(exist_ok=True)
         self.runs_dir.mkdir(exist_ok=True)
         self.replays = replays or ReplayStore(root)
+        self.operation_gate = operation_gate or OperationGate()
         self.lock = threading.RLock()
         self.stop_event = threading.Event()
         self.thread: threading.Thread | None = None
@@ -59,13 +62,18 @@ class TrainingManager:
         with self.lock:
             if self.thread and self.thread.is_alive():
                 raise ValueError("Já existe um treinamento em andamento.")
-            self.stop_event.clear()
-            run_id = datetime.now().strftime("%Y%m%d-%H%M%S") + "-" + uuid.uuid4().hex[:6]
-            config = self._normalize_config(config)
-            self.state = {**self._idle_state(), "running": True, "stage": "Preparando dados", "run_id": run_id, "config": config}
-            self.thread = threading.Thread(target=self._run, args=(run_id, config), daemon=True)
-            self.thread.start()
-            return self.status()
+            self.operation_gate.acquire("training")
+            try:
+                self.stop_event.clear()
+                run_id = datetime.now().strftime("%Y%m%d-%H%M%S") + "-" + uuid.uuid4().hex[:6]
+                config = self._normalize_config(config)
+                self.state = {**self._idle_state(), "running": True, "stage": "Preparando dados", "run_id": run_id, "config": config}
+                self.thread = threading.Thread(target=self._run, args=(run_id, config), daemon=True)
+                self.thread.start()
+                return self.status()
+            except Exception:
+                self.operation_gate.release("training")
+                raise
 
     @staticmethod
     def _normalize_config(config: dict) -> dict:
@@ -147,6 +155,8 @@ class TrainingManager:
         except Exception as exc:
             self._set(running=False, stage="Interrompido" if self.stop_event.is_set() else "Falha", error=str(exc))
             self._log(str(exc))
+        finally:
+            self.operation_gate.release("training")
 
     def _train_imitation(self, packed, config) -> None:
         x_train, y_train = packed["train"]

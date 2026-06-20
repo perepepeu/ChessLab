@@ -16,6 +16,7 @@ from chesslab.replays import ReplayStore
 from chesslab.competition import TournamentManager
 from chesslab.training import TrainingManager
 from chesslab.sessions import GameSessionStore
+from chesslab.operations import OperationGate
 
 
 PGN = b'''[Event "Tiny"]
@@ -178,6 +179,26 @@ class SessionTests(unittest.TestCase):
             self.assertEqual(restored["board"].fen(), board.fen())
             self.assertEqual(restored["strength"], "tactical")
             second.close()
+
+
+class OperationTests(unittest.TestCase):
+    def test_training_and_tournament_cannot_own_gate_together(self):
+        gate = OperationGate()
+        gate.acquire("training")
+        with self.assertRaisesRegex(ValueError, "training"):
+            gate.acquire("tournament")
+        gate.release("training")
+        gate.acquire("tournament")
+        self.assertEqual(gate.current(), "tournament")
+
+    def test_failed_tournament_start_releases_gate(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            gate = OperationGate()
+            manager = TournamentManager(root, ReplayStore(root), gate)
+            with self.assertRaises(ValueError):
+                manager.start({"model_ids": []})
+            self.assertIsNone(gate.current())
 
 
 if __name__ == "__main__":
